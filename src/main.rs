@@ -2,7 +2,9 @@ use std::env;
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-use serenity::all::{ChannelId, CreateAllowedMentions, CreateMessage, Ready, RoleId};
+use serenity::all::{
+    ChannelId, CreateAllowedMentions, CreateMessage, GuildId, MessageUpdateEvent, Ready, RoleId
+};
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::prelude::*;
@@ -25,9 +27,8 @@ fn create_message(content: String) -> CreateMessage {
 
 struct Handler;
 
-#[async_trait]
-impl EventHandler for Handler {
-    async fn message(&self, ctx: Context, msg: Message) {
+impl Handler {
+    async fn handle_message(&self, ctx: &Context, guild_id: GuildId, msg: Message) {
         if !TRIGGER_REGEX.is_match(&msg.content) {
             return;
         }
@@ -36,7 +37,7 @@ impl EventHandler for Handler {
             return;
         }
 
-        let member = match msg.member(&ctx.http).await {
+        let member = match guild_id.member(&ctx.http, msg.author.id).await {
             Ok(member) => member,
             Err(why) => return error!("Failed to get member: {:?}", why),
         };
@@ -60,6 +61,36 @@ impl EventHandler for Handler {
         let log = create_message(format!("{} にロールを追加しました。", member.mention()));
         if let Err(why) = LOG_CHANNEL_ID.send_message(&ctx.http, log).await {
             error!("Error sending message: {:?}", why)
+        }
+    }
+}
+
+#[async_trait]
+impl EventHandler for Handler {
+    async fn message(&self, ctx: Context, msg: Message) {
+        let guild_id = match msg.guild_id {
+            Some(guild_id) => guild_id,
+            None => return error!("Failed to get guild id: {:?}", msg),
+        };
+        self.handle_message(&ctx, guild_id, msg).await;
+    }
+
+    async fn message_update(
+        &self,
+        ctx: Context,
+        _: Option<Message>,
+        _: Option<Message>,
+        event: MessageUpdateEvent,
+    ) {
+        let guild_id = match event.guild_id {
+            Some(guild_id) => guild_id,
+            None => return error!("Failed to get guild id: {:?}", event),
+        };
+        match event.channel_id.message(&ctx.http, event.id).await {
+            Ok(msg) => {
+                self.handle_message(&ctx, guild_id, msg).await
+            }
+            Err(why) => error!("Failed to get message: {:?}", why),
         }
     }
 
