@@ -1,23 +1,23 @@
 use std::env;
+use std::sync::LazyLock;
 
-use once_cell::sync::Lazy;
 use regex::Regex;
 use serenity::all::{
-    ChannelId, CreateAllowedMentions, CreateMessage, GuildId, MessageUpdateEvent, Ready, RoleId
+    ChannelId, CreateAllowedMentions, CreateMessage, GuildId, MessageUpdateEvent, Ready, RoleId,
 };
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::prelude::*;
 use tracing::{error, info};
 
-static TRIGGER_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(&env::var("TRIGGER_REGEX").unwrap()).unwrap());
-static CHANNEL_ID: Lazy<ChannelId> =
-    Lazy::new(|| ChannelId::new(env::var("CHANNEL_ID").unwrap().parse().unwrap()));
-static LOG_CHANNEL_ID: Lazy<ChannelId> =
-    Lazy::new(|| ChannelId::new(env::var("LOG_CHANNEL_ID").unwrap().parse().unwrap()));
-static ROLE_ID: Lazy<RoleId> =
-    Lazy::new(|| RoleId::new(env::var("ROLE_ID").unwrap().parse().unwrap()));
+static TRIGGER_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(&env::var("TRIGGER_REGEX").unwrap()).unwrap());
+static CHANNEL_ID: LazyLock<ChannelId> =
+    LazyLock::new(|| ChannelId::new(env::var("CHANNEL_ID").unwrap().parse().unwrap()));
+static LOG_CHANNEL_ID: LazyLock<ChannelId> =
+    LazyLock::new(|| ChannelId::new(env::var("LOG_CHANNEL_ID").unwrap().parse().unwrap()));
+static ROLE_ID: LazyLock<RoleId> =
+    LazyLock::new(|| RoleId::new(env::var("ROLE_ID").unwrap().parse().unwrap()));
 
 fn create_message(content: String) -> CreateMessage {
     CreateMessage::new()
@@ -43,6 +43,7 @@ impl Handler {
         };
 
         if member.roles.contains(&ROLE_ID) {
+            error!("{} already has the role", member.user.name);
             return;
         }
 
@@ -68,9 +69,8 @@ impl Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
-        let guild_id = match msg.guild_id {
-            Some(guild_id) => guild_id,
-            None => return error!("Failed to get guild id: {:?}", msg),
+        let Some(guild_id) = msg.guild_id else {
+            return error!("Failed to get guild id: {:?}", msg);
         };
         self.handle_message(&ctx, guild_id, msg).await;
     }
@@ -82,14 +82,11 @@ impl EventHandler for Handler {
         _: Option<Message>,
         event: MessageUpdateEvent,
     ) {
-        let guild_id = match event.guild_id {
-            Some(guild_id) => guild_id,
-            None => return error!("Failed to get guild id: {:?}", event),
+        let Some(guild_id) = event.guild_id else {
+            return error!("Failed to get guild id: {:?}", event);
         };
         match event.channel_id.message(&ctx.http, event.id).await {
-            Ok(msg) => {
-                self.handle_message(&ctx, guild_id, msg).await
-            }
+            Ok(msg) => self.handle_message(&ctx, guild_id, msg).await,
             Err(why) => error!("Failed to get message: {:?}", why),
         }
     }

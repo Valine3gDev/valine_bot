@@ -1426,7 +1426,6 @@ name = "simple_auth_bot"
 version = "0.1.0"
 dependencies = [
  "dotenvy",
- "once_cell",
  "regex",
  "serenity",
  "tokio",
