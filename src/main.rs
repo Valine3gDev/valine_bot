@@ -1,10 +1,17 @@
 mod features;
 mod utils;
 
-use std::env;
+use std::{env, sync::Arc};
 
-use serenity::{all::Ready, async_trait, prelude::*};
+use features::{MessageCache, MessageCacheType};
+use serenity::{
+    all::Ready,
+    async_trait,
+    cache::Settings as CacheSettings,
+    prelude::*,
+};
 use tracing::{error, info};
+
 
 struct MainHandler;
 
@@ -22,11 +29,17 @@ async fn main() {
     let _ = dotenvy::dotenv();
 
     let token = env::var("TOKEN").expect("Expected a TOKEN in the environment");
-    let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
+    let intents =
+        GatewayIntents::GUILD_MESSAGES | GatewayIntents::GUILDS | GatewayIntents::MESSAGE_CONTENT;
+    let mut settings = CacheSettings::default();
+    settings.max_messages = 1_000_000;
     let mut client = Client::builder(&token, intents)
         .event_handler(MainHandler)
         .event_handler(features::AuthHandler)
         .event_handler(features::LoggingHandler)
+        .event_handler(features::MessageCacheHandler)
+        .cache_settings(settings)
+        .type_map_insert::<MessageCacheType>(Arc::new(MessageCache::new()))
         .await
         .expect("Err creating client");
 

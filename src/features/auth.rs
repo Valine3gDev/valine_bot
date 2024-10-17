@@ -2,13 +2,13 @@ use std::env;
 use std::sync::LazyLock;
 
 use regex::Regex;
-use serenity::all::{ChannelId, GuildId, MessageUpdateEvent, RoleId};
+use serenity::all::{ChannelId, GuildId, MessageUpdateEvent, RoleId, User};
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::prelude::*;
 use tracing::error;
 
-use crate::utils::create_message;
+use crate::utils::{create_message, get_message};
 
 static TRIGGER_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(&env::var("TRIGGER_REGEX").unwrap()).unwrap());
@@ -22,16 +22,23 @@ static ROLE_ID: LazyLock<RoleId> =
 pub struct Handler;
 
 impl Handler {
-    async fn handle_message(&self, ctx: &Context, guild_id: GuildId, msg: Message) {
-        if !TRIGGER_REGEX.is_match(&msg.content) {
+    async fn handle_message(
+        &self,
+        ctx: &Context,
+        guild_id: GuildId,
+        channel_id: ChannelId,
+        author: User,
+        content: String,
+    ) {
+        if !TRIGGER_REGEX.is_match(&content) {
             return;
         }
 
-        if msg.channel_id != *CHANNEL_ID {
+        if channel_id != *CHANNEL_ID {
             return;
         }
 
-        let member = match guild_id.member(&ctx.http, msg.author.id).await {
+        let member = match guild_id.member(&ctx.http, author.id).await {
             Ok(member) => member,
             Err(why) => return error!("Failed to get member: {:?}", why),
         };
@@ -66,7 +73,8 @@ impl EventHandler for Handler {
         let Some(guild_id) = msg.guild_id else {
             return error!("Failed to get guild id: {:?}", msg);
         };
-        self.handle_message(&ctx, guild_id, msg).await;
+
+        self.handle_message(&ctx, guild_id, msg.channel_id, msg.author, msg.content).await;
     }
 
     async fn message_update(
@@ -79,8 +87,16 @@ impl EventHandler for Handler {
         let Some(guild_id) = event.guild_id else {
             return error!("Failed to get guild id: {:?}", event);
         };
-        match event.channel_id.message(&ctx.http, event.id).await {
-            Ok(msg) => self.handle_message(&ctx, guild_id, msg).await,
+        let Some(author) = event.author else {
+            return error!("Failed to get author: {:?}", event);
+        };
+        if let Some(content) = event.content {
+            self.handle_message(&ctx, guild_id, event.channel_id, author, content).await;
+            return;
+        }
+
+        match get_message(&ctx, event.channel_id, event.id).await {
+            Ok(m) => self.handle_message(&ctx, guild_id, event.channel_id, author, m.content).await,
             Err(why) => error!("Failed to get message: {:?}", why),
         }
     }
