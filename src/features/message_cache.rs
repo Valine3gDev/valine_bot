@@ -13,8 +13,8 @@ use serenity::{
 };
 use tracing::info;
 
-static MESSAGE_CACHE_GUILD_ID: LazyLock<GuildId> =
-    LazyLock::new(|| GuildId::new(env::var("MESSAGE_CACHE_GUILD_ID").unwrap().parse().unwrap()));
+#[rustfmt::skip]
+static MESSAGE_CACHE_GUILD_ID: LazyLock<GuildId> = LazyLock::new(|| GuildId::new(env::var("MESSAGE_CACHE_GUILD_ID").unwrap().parse().unwrap()));
 
 pub struct MessageCache {
     cache: DashMap<ChannelId, HashMap<MessageId, Message>>,
@@ -22,9 +22,12 @@ pub struct MessageCache {
 
 impl MessageCache {
     pub fn new() -> Self {
-        Self {
-            cache: DashMap::new(),
-        }
+        Self { cache: DashMap::new() }
+    }
+
+    pub fn insert(&self, message: Message) {
+        let mut map = self.cache.entry(message.channel_id).or_insert(HashMap::new());
+        map.insert(message.id, message);
     }
 
     pub fn extend(&self, iter: impl IntoIterator<Item = (ChannelId, MessageId, Message)>) {
@@ -57,12 +60,6 @@ impl MessageCache {
         let map = self.cache.get(&channel_id)?;
         map.get(&message_id).cloned()
     }
-
-    pub fn get_messages(&self, channel_id: ChannelId) -> Option<Vec<Message>> {
-        self.cache
-            .get(&channel_id)
-            .map(|map| map.values().cloned().collect())
-    }
 }
 
 impl Default for MessageCache {
@@ -77,21 +74,24 @@ impl TypeMapKey for MessageCacheType {
     type Value = Arc<MessageCache>;
 }
 
-pub struct Handler;
+pub struct Handler {
+    pub disabled: bool,
+}
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn cache_ready(&self, ctx: Context, _: Vec<GuildId>) {
+        if self.disabled {
+            return;
+        }
+
         let channels = MESSAGE_CACHE_GUILD_ID.channels(&ctx.http).await.unwrap();
         for (id, channel) in channels.iter() {
             if !channel.is_text_based() {
                 continue;
             }
 
-            let Ok(messages) = channel
-                .messages(&ctx.http, GetMessages::new().limit(100))
-                .await
-            else {
+            let Ok(messages) = channel.messages(&ctx.http, GetMessages::new().limit(100)).await else {
                 info!("Failed to get messages for channel: {:?}", channel.name);
                 continue;
             };
@@ -100,10 +100,7 @@ impl EventHandler for Handler {
             let cache = data.get_mut::<MessageCacheType>().unwrap();
             let len = messages.len();
             cache.extend_messages(messages);
-            info!(
-                "Cached {} messages for channel: {} ({})",
-                len, channel.name, id
-            );
+            info!("Cached {} messages for channel: {} ({})", len, channel.name, id);
         }
         info!("Cache ready!");
     }
