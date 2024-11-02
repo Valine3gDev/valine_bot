@@ -23,6 +23,11 @@ async fn main() {
     let _ = dotenvy::dotenv();
 
     let token = env::var("TOKEN").expect("Expected a TOKEN in the environment");
+    let cache_disabled = env::var("CACHE_DISABLED")
+        .expect("Expected a CACHE_DISABLED in the environment")
+        .parse::<bool>()
+        .expect("CACHE_DISABLED must be a boolean");
+
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::GUILDS | GatewayIntents::MESSAGE_CONTENT;
     let mut settings = CacheSettings::default();
     settings.max_messages = 1_000_000;
@@ -30,7 +35,9 @@ async fn main() {
         .event_handler(MainHandler)
         .event_handler(features::AuthHandler)
         .event_handler(features::LoggingHandler)
-        .event_handler(features::MessageCacheHandler { disabled: false })
+        .event_handler(features::MessageCacheHandler {
+            disabled: cache_disabled,
+        })
         .cache_settings(settings)
         .type_map_insert::<MessageCacheType>(Arc::new(MessageCache::new()))
         .await

@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use serenity::{
-    all::{ChannelId, Context, CreateAllowedMentions, CreateMessage, Message, MessageId},
+    all::{CacheHttp, ChannelId, Context, CreateAllowedMentions, CreateMessage, Message, MessageId, ReactionType},
     Result,
 };
 use similar::{Algorithm, ChangeTag, TextDiff};
@@ -35,6 +35,15 @@ pub async fn get_message(ctx: &Context, channel_id: ChannelId, message_id: Messa
     }
 
     channel_id.message(&ctx.http, message_id).await
+}
+
+pub async fn react_from_id(
+    ctx: &Context,
+    channel_id: ChannelId,
+    message_id: MessageId,
+    reaction_type: &ReactionType,
+) -> Result<()> {
+    ctx.http().create_reaction(channel_id, message_id, reaction_type).await
 }
 
 pub fn create_diff_lines_text(old: &str, new: &str) -> String {
