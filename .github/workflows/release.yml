@@ -36,7 +36,7 @@ jobs:
 
       # zigをインストール
       - name: Install Zig
-        uses: goto-bus-stop/setup-zig@v2
+        uses: mlugg/setup-zig@v1
 
       # rustをインストール
       - name: Install Rust toolchain
