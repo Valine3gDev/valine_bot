@@ -26,3 +26,15 @@ channel_id = "000000000000000000"
 disabled = true
 # 過去のメッセージのキャッシュを取るギルドIDのリスト
 target_guild_ids = ["000000000000000000"]
+
+
+[thread_channel_startup]
+# 空にする方法
+# threads = []
+
+[[thread_channel_startup.threads]]
+# 初期メッセージを投稿するスレッドチャンネルのID
+channel_id = "000000000000000000"
+# 初期メッセージの内容
+startup_message = """スレッドの始まりだぁ！
+まずはこのテンプレートを読んでね！"""

@@ -20,6 +20,7 @@ pub struct Config {
     pub auth: AuthConfig,
     pub message_logging: MessageLoggingConfig,
     pub message_cache: MessageCacheConfig,
+    pub thread_channel_startup: ThreadChannelStartupConfig,
 }
 
 impl TypeMapKey for Config {
@@ -52,4 +53,15 @@ pub struct MessageLoggingConfig {
 pub struct MessageCacheConfig {
     pub disabled: bool,
     pub target_guild_ids: Vec<GuildId>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ThreadChannelStartupConfig {
+    pub threads: Vec<ThreadStartupConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ThreadStartupConfig {
+    pub channel_id: ChannelId,
+    pub startup_message: String,
 }

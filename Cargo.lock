@@ -2073,7 +2073,7 @@ checksum = "f4bf03e0ca70d626ecc4ba6b0763b934b6f2976e8c744088bb3c1d646fbb1ad0"
 
 [[package]]
 name = "valine_bot"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "dashmap 6.1.0",
  "itertools",

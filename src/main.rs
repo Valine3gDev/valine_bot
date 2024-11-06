@@ -37,6 +37,7 @@ async fn main() {
         .event_handler(MainHandler)
         .event_handler(features::AuthHandler)
         .event_handler(features::LoggingHandler)
+        .event_handler(features::ThreadChannelStartupHandler)
         .event_handler(features::MessageCacheHandler {
             disabled: config.message_cache.disabled,
         })
