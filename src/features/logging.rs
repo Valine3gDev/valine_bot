@@ -1,5 +1,3 @@
-use std::{env, sync::LazyLock};
-
 use itertools::enumerate;
 use serenity::{
     all::{
@@ -12,12 +10,10 @@ use serenity::{
 use tracing::error;
 
 use crate::{
+    config::get_config,
     features::MessageCacheType,
-    utils::{create_diff_lines_text, create_safe_message, get_cached_message},
+    utils::{create_diff_lines_text, create_safe_message, get_cached_message, send_message},
 };
-
-#[rustfmt::skip]
-static LOG_CHANNEL_ID: LazyLock<ChannelId> = LazyLock::new(|| ChannelId::new(env::var("MESSAGE_LOG_CHANNEL_ID").unwrap().parse().unwrap()));
 
 pub struct Handler;
 
@@ -92,6 +88,12 @@ impl Handler {
         let cache = data.get_mut::<MessageCacheType>().unwrap();
         cache.insert(message.clone());
     }
+
+    async fn send_log(&self, ctx: &Context, embed: CreateEmbed) {
+        let config = get_config(ctx).await;
+        let log = create_safe_message().add_embed(embed);
+        let _ = send_message(ctx, &config.message_logging.channel_id, log).await;
+    }
 }
 
 #[async_trait]
@@ -138,10 +140,7 @@ impl EventHandler for Handler {
             );
 
         embed = self.build_embed(&message, new_message.content, embed);
-        let log = create_safe_message().add_embed(embed);
-        if let Err(why) = LOG_CHANNEL_ID.send_message(&ctx.http, log).await {
-            error!("Error sending message: {:?}", why)
-        }
+        self.send_log(&ctx, embed).await;
     }
 
     async fn message_delete(
@@ -181,9 +180,6 @@ impl EventHandler for Handler {
             );
 
         embed = self.build_embed(&message, "".to_string(), embed);
-        let log = create_safe_message().add_embed(embed);
-        if let Err(why) = LOG_CHANNEL_ID.send_message(&ctx.http, log).await {
-            error!("Error sending message: {:?}", why)
-        }
+        self.send_log(&ctx, embed).await;
     }
 }

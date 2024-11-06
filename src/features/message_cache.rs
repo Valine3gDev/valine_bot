@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    env,
-    sync::{Arc, LazyLock},
-};
+use std::{collections::HashMap, sync::Arc};
 
 use dashmap::DashMap;
 use itertools::Itertools;
@@ -11,10 +7,9 @@ use serenity::{
     async_trait,
     prelude::TypeMapKey,
 };
-use tracing::info;
+use tracing::{error, info};
 
-#[rustfmt::skip]
-static MESSAGE_CACHE_GUILD_ID: LazyLock<GuildId> = LazyLock::new(|| GuildId::new(env::var("MESSAGE_CACHE_GUILD_ID").unwrap().parse().unwrap()));
+use crate::config::get_config;
 
 pub struct MessageCache {
     cache: DashMap<ChannelId, HashMap<MessageId, Message>>,
@@ -85,22 +80,29 @@ impl EventHandler for Handler {
             return;
         }
 
-        let channels = MESSAGE_CACHE_GUILD_ID.channels(&ctx.http).await.unwrap();
-        for (id, channel) in channels.iter() {
-            if !channel.is_text_based() {
-                continue;
-            }
-
-            let Ok(messages) = channel.messages(&ctx.http, GetMessages::new().limit(100)).await else {
-                info!("Failed to get messages for channel: {:?}", channel.name);
+        let config = get_config(&ctx).await;
+        for guild in &config.message_cache.target_guild_ids {
+            let Ok(channels) = guild.channels(&ctx.http).await else {
+                error!("Failed to get channels for guild: {:?}", guild);
                 continue;
             };
 
-            let mut data = ctx.data.write().await;
-            let cache = data.get_mut::<MessageCacheType>().unwrap();
-            let len = messages.len();
-            cache.extend_messages(messages);
-            info!("Cached {} messages for channel: {} ({})", len, channel.name, id);
+            for (id, channel) in channels {
+                if !channel.is_text_based() {
+                    continue;
+                }
+
+                let Ok(messages) = channel.messages(&ctx.http, GetMessages::new().limit(100)).await else {
+                    info!("Failed to get messages for channel: {:?}", channel.name);
+                    continue;
+                };
+
+                let mut data = ctx.data.write().await;
+                let cache = data.get_mut::<MessageCacheType>().unwrap();
+                let len = messages.len();
+                cache.extend_messages(messages);
+                info!("Cached {} messages for channel: {} ({})", len, channel.name, id);
+            }
         }
         info!("Cache ready!");
     }

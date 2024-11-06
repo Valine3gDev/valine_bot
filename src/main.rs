@@ -1,8 +1,10 @@
+mod config;
 mod features;
 mod utils;
 
-use std::{env, sync::Arc};
+use std::{fs::read_to_string, sync::Arc};
 
+use config::Config;
 use features::{MessageCache, MessageCacheType};
 use serenity::{all::Ready, async_trait, cache::Settings as CacheSettings, prelude::*};
 use tracing::{error, info};
@@ -20,26 +22,27 @@ impl EventHandler for MainHandler {
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let _ = dotenvy::dotenv();
-
-    let token = env::var("TOKEN").expect("Expected a TOKEN in the environment");
-    let cache_disabled = env::var("CACHE_DISABLED")
-        .expect("Expected a CACHE_DISABLED in the environment")
-        .parse::<bool>()
-        .expect("CACHE_DISABLED must be a boolean");
+    let config = read_to_string("config.toml").expect("Failed to read config.toml");
+    let config = match toml::from_str::<Config>(&config) {
+        Ok(config) => config,
+        Err(e) => {
+            panic!("Failed to parse config.toml: {}", e);
+        }
+    };
 
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::GUILDS | GatewayIntents::MESSAGE_CONTENT;
     let mut settings = CacheSettings::default();
     settings.max_messages = 1_000_000;
-    let mut client = Client::builder(&token, intents)
+    let mut client = Client::builder(&config.bot.token, intents)
         .event_handler(MainHandler)
         .event_handler(features::AuthHandler)
         .event_handler(features::LoggingHandler)
         .event_handler(features::MessageCacheHandler {
-            disabled: cache_disabled,
+            disabled: config.message_cache.disabled,
         })
         .cache_settings(settings)
         .type_map_insert::<MessageCacheType>(Arc::new(MessageCache::new()))
+        .type_map_insert::<Config>(Arc::new(config))
         .await
         .expect("Err creating client");
 

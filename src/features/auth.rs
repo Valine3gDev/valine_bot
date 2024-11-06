@@ -1,25 +1,11 @@
-use std::env;
-use std::sync::LazyLock;
-
-use regex::Regex;
-use serenity::all::{ChannelId, GuildId, MessageId, MessageUpdateEvent, ReactionType, RoleId, User};
+use serenity::all::{ChannelId, GuildId, MessageId, MessageUpdateEvent, User};
+use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::prelude::*;
-use serenity::{async_trait, utils};
 use tracing::error;
 
-use crate::utils::{create_message, get_message, react_from_id};
-
-#[rustfmt::skip]
-static TRIGGER_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(&env::var("TRIGGER_REGEX").unwrap()).unwrap());
-#[rustfmt::skip]
-static CHANNEL_ID: LazyLock<ChannelId> = LazyLock::new(|| ChannelId::new(env::var("CHANNEL_ID").unwrap().parse().unwrap()));
-#[rustfmt::skip]
-static LOG_CHANNEL_ID: LazyLock<ChannelId> = LazyLock::new(|| ChannelId::new(env::var("LOG_CHANNEL_ID").unwrap().parse().unwrap()));
-#[rustfmt::skip]
-static ROLE_ID: LazyLock<RoleId> = LazyLock::new(|| RoleId::new(env::var("ROLE_ID").unwrap().parse().unwrap()));
-#[rustfmt::skip]
-static AUTHENTICATED_REACTION: LazyLock<ReactionType> = LazyLock::new(|| utils::parse_emoji(env::var("AUTHENTICATED_REACTION").unwrap()).unwrap().into());
+use crate::config::get_config;
+use crate::utils::{create_message, get_message, react_from_id, send_message};
 
 pub struct Handler;
 
@@ -33,11 +19,13 @@ impl Handler {
         author: User,
         content: String,
     ) {
-        if !TRIGGER_REGEX.is_match(&content) {
+        let config = &get_config(ctx).await.auth;
+
+        if !config.trigger_regex.is_match(&content) {
             return;
         }
 
-        if channel_id != *CHANNEL_ID {
+        if channel_id != config.channel_id {
             return;
         }
 
@@ -46,31 +34,25 @@ impl Handler {
             Err(why) => return error!("Failed to get member: {:?}", why),
         };
 
-        if member.roles.contains(&ROLE_ID) {
+        if member.roles.contains(&config.role_id) {
             error!("{} already has the role", member.user.name);
             return;
         }
 
-        if let Err(why) = member.add_role(&ctx.http, *ROLE_ID).await {
+        if let Err(why) = member.add_role(&ctx.http, config.role_id).await {
             let log = create_message(format!(
                 "{} にロールを追加できませんでした。\n```\n{}```",
                 member.mention(),
                 why
             ));
-            if let Err(why) = LOG_CHANNEL_ID.send_message(&ctx.http, log).await {
-                error!("Error sending message: {:?}", why)
-            }
+            let _ = send_message(ctx, &config.log_channel_id, log).await;
             return error!("Failed to add role: {:?}", why);
         }
 
-        if let Err(why) = react_from_id(ctx, channel_id, message_id, &AUTHENTICATED_REACTION).await {
-            error!("Failed to react to message: {:?}", why);
-        }
+        react_from_id(ctx, channel_id, message_id, &config.authenticated_reaction).await;
 
         let log = create_message(format!("{} にロールを追加しました。", member.mention()));
-        if let Err(why) = LOG_CHANNEL_ID.send_message(&ctx.http, log).await {
-            error!("Error sending message: {:?}", why)
-        }
+        let _ = send_message(ctx, &config.log_channel_id, log).await;
     }
 }
 
