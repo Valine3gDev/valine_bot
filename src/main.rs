@@ -4,6 +4,7 @@ mod utils;
 
 use std::{fs::read_to_string, sync::Arc};
 
+use bpaf::Bpaf;
 use config::Config;
 use features::{MessageCache, MessageCacheType};
 use serenity::{all::Ready, async_trait, cache::Settings as CacheSettings, prelude::*};
@@ -18,6 +19,13 @@ impl EventHandler for MainHandler {
     }
 }
 
+#[derive(Clone, Debug, Bpaf)]
+#[bpaf(options, version)]
+struct Options {
+    #[bpaf(short, long)]
+    check_config: bool,
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
@@ -29,6 +37,13 @@ async fn main() {
             panic!("Failed to parse config.toml: {}", e);
         }
     };
+
+    let options = options().run();
+
+    if options.check_config {
+        println!("Config is valid");
+        return;
+    }
 
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::GUILDS | GatewayIntents::MESSAGE_CONTENT;
     let mut settings = CacheSettings::default();
