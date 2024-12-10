@@ -60,7 +60,7 @@ pub fn create_diff_lines_text(old: &str, new: &str) -> String {
         .map(|c| match c.tag() {
             ChangeTag::Delete => format!("- {}", c),
             ChangeTag::Insert => format!("+ {}", c),
-            ChangeTag::Equal => c.to_string(),
+            ChangeTag::Equal => format!("  {}", c),
         })
         .join("")
 }
