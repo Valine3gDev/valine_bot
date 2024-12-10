@@ -34,6 +34,8 @@ impl Handler {
             Err(why) => return error!("Failed to get member: {:?}", why),
         };
 
+        react_from_id(ctx, channel_id, message_id, &config.authenticated_reaction).await;
+
         if member.roles.contains(&config.role_id) {
             error!("{} already has the role", member.user.name);
             return;
@@ -48,8 +50,6 @@ impl Handler {
             let _ = send_message(ctx, &config.log_channel_id, log).await;
             return error!("Failed to add role: {:?}", why);
         }
-
-        react_from_id(ctx, channel_id, message_id, &config.authenticated_reaction).await;
 
         let log = create_message(format!("{} にロールを追加しました。", member.mention()));
         let _ = send_message(ctx, &config.log_channel_id, log).await;
