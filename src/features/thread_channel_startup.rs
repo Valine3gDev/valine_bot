@@ -14,8 +14,8 @@ pub struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn thread_create(&self, ctx: Context, thread: GuildChannel) {
-        // スレッドの作成時とスレッドの初期メッセージ送信後にイベントが発火するので、初期メッセージ送信後は何もしない
-        if thread.last_message_id.is_some() {
+        // スレッドの作成時とスレッドの初期メッセージ送信後にイベントが発火するので、スレッド作成時は無視する
+        if thread.last_message_id.is_none() {
             return;
         }
 
