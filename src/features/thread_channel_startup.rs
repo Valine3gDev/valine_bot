@@ -15,7 +15,8 @@ pub struct Handler;
 impl EventHandler for Handler {
     async fn thread_create(&self, ctx: Context, thread: GuildChannel) {
         // スレッドの作成時とスレッドの初期メッセージ送信後にイベントが発火するので、スレッド作成時は無視する
-        if thread.last_message_id.is_none() {
+        // スレッドとフォーラム共通で初期メッセージが送信されるまで、メンバーが存在しないためこれを利用して判定する
+        if thread.member.is_some() {
             return;
         }
 
