@@ -2,8 +2,8 @@ use itertools::enumerate;
 use serenity::{
     all::{
         ChannelId, Color, Context, CreateEmbed, EmbedMessageBuilding, EventHandler, FormattedTimestamp,
-        FormattedTimestampStyle, GuildId, Mentionable, Message, MessageBuilder, MessageId, MessageUpdateEvent,
-        Timestamp,
+        FormattedTimestampStyle, GuildId, Mentionable, Message, MessageBuilder, MessageId, MessageReferenceKind,
+        MessageUpdateEvent, Timestamp,
     },
     async_trait,
 };
@@ -19,17 +19,23 @@ pub struct Handler;
 
 impl Handler {
     pub fn build_embed(&self, message: &Message, new_content: String, mut embed: CreateEmbed) -> CreateEmbed {
-        if let Some(message_reference) = &message.message_reference {
-            let id = message_reference.message_id.unwrap_or(MessageId::default());
-
-            let mut builder = MessageBuilder::new();
-            builder
-                .push_bold_safe("元メッセージ: ")
-                .push_safe(id.link(message_reference.channel_id, message_reference.guild_id))
-                .push_safe(" ")
-                .push_mono_line_safe(id.to_string());
-
-            embed = embed.field("__**転送**__", builder.build(), false);
+        if let Some(m_ref) = &message.message_reference {
+            let id = m_ref.message_id.unwrap_or(MessageId::default());
+            let (name, content) = match m_ref.kind {
+                MessageReferenceKind::Default => ("__**返信**__", "返信先: "),
+                MessageReferenceKind::Forward => ("__**転送**__", "転送元: "),
+                _ => ("__**不明**__", "不明な対象メッセージ: "),
+            };
+            embed = embed.field(
+                name,
+                MessageBuilder::new()
+                    .push_bold_safe(content)
+                    .push_safe(id.link(m_ref.channel_id, m_ref.guild_id))
+                    .push_safe(" ")
+                    .push_mono_line_safe(id.to_string())
+                    .build(),
+                false,
+            )
         }
 
         if let Some(poll) = &message.poll {
@@ -42,13 +48,13 @@ impl Handler {
             let results = &poll.results;
 
             for (i, answer) in enumerate(&poll.answers) {
-                builder.push_safe(&format!(
+                builder.push_safe(format!(
                     "- {}",
                     answer.poll_media.text.clone().unwrap_or("<不明な回答>".to_string())
                 ));
 
                 match results {
-                    Some(results) => builder.push_line_safe(&format!(": {}票", results.answer_counts[i].count)),
+                    Some(results) => builder.push_line_safe(format!(": {}票", results.answer_counts[i].count)),
                     None => builder.push_safe("\n"),
                 };
             }
