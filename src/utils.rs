@@ -12,7 +12,7 @@ pub fn create_safe_message() -> CreateMessage {
     CreateMessage::new().allowed_mentions(CreateAllowedMentions::new().all_users(false))
 }
 
-pub fn create_message(content: String) -> CreateMessage {
+pub fn create_message(content: impl Into<String>) -> CreateMessage {
     create_safe_message().content(content)
 }
 

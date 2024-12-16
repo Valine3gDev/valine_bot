@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use serenity::{
     all::{Context, EventHandler, GuildChannel},
     async_trait,
@@ -14,22 +16,30 @@ pub struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn thread_create(&self, ctx: Context, thread: GuildChannel) {
-        // スレッドの作成時とスレッドの初期メッセージ送信後にイベントが発火するので、スレッド作成時は無視する
-        // スレッドとフォーラム共通で初期メッセージが送信されるまで、メンバーが存在しないためこれを利用して判定する
-        if thread.member.is_some() {
+        // Botがメッセージを送信すると二度イベントが発火するので、初期メッセージ送信後のイベントは無視する
+        if thread.last_message_id.is_some() {
             return;
         }
+
+        // 初期メッセージが送信されるか、1秒経つまで待機
+        let _ = thread
+            .await_reply(&ctx.shard)
+            .author_id(thread.owner_id.unwrap())
+            .timeout(Duration::from_secs(1))
+            .next()
+            .await;
 
         let config = &get_config(&ctx).await.thread_channel_startup;
         let Some(parent_id) = thread.parent_id else {
             return error!("Failed to get parent id: {:?}", thread);
         };
+
         for thread_config in &config.threads {
             if parent_id != thread_config.channel_id {
                 continue;
             }
 
-            let log = create_message(thread_config.startup_message.clone());
+            let log = create_message(&thread_config.startup_message);
             let _ = send_message(&ctx, &thread.id, log).await;
         }
     }
