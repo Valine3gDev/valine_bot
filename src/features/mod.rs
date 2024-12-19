@@ -4,7 +4,6 @@ mod message_cache;
 mod thread_channel_startup;
 mod thread_pin;
 
-pub use auth::Handler as AuthHandler;
 pub use logging::Handler as LoggingHandler;
 pub use message_cache::Handler as MessageCacheHandler;
 pub use thread_channel_startup::Handler as ThreadChannelStartupHandler;
@@ -16,7 +15,7 @@ pub type PContext<'a> = poise::Context<'a, (), PError>;
 pub type PCommand = poise::Command<(), PError>;
 
 pub fn commands() -> Vec<PCommand> {
-    build_commands(vec![thread_pin::pin])
+    build_commands(vec![auth::keyword, thread_pin::pin])
 }
 
 fn alias_command(base: fn() -> PCommand, name: String) -> PCommand {

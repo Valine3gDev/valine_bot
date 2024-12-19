@@ -34,6 +34,10 @@ struct Options {
 
 pub async fn on_error(error: FrameworkError<'_, (), PError>) {
     match error {
+        FrameworkError::Command { error, ctx, .. } => {
+            let _ = say_reply(ctx, "コマンド実行中にエラーが発生しました。").await;
+            error!("Command error: {}", error);
+        }
         FrameworkError::ArgumentParse { ctx, input, error, .. } => {
             let Some(input) = input else {
                 return error!("Error parsing input: {:?}", error);
@@ -107,7 +111,6 @@ async fn main() {
     let mut client = Client::builder(&config.bot.token, intents)
         .framework(framework)
         .event_handler(MainHandler)
-        .event_handler(features::AuthHandler)
         .event_handler(features::LoggingHandler)
         .event_handler(features::ThreadChannelStartupHandler)
         .event_handler(features::MessageCacheHandler {

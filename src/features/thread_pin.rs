@@ -5,6 +5,7 @@ use serenity::{
     all::{Message, MessageType},
     futures::StreamExt,
 };
+use tracing::error;
 
 use super::PContext;
 use crate::{config::get_config, on_error, PError};
@@ -12,7 +13,8 @@ use crate::{config::get_config, on_error, PError};
 async fn pin_on_error(error: FrameworkError<'_, (), PError>) {
     match error {
         FrameworkError::Command { ctx, error, .. } => {
-            let _ = say_reply(ctx, format!("ピン留めに失敗しました: {}", error)).await;
+            let _ = say_reply(ctx, "ピン留め中にエラーが発生しました。").await;
+            error!("Command error: {}", error);
         }
         error => {
             let _ = on_error(error).await;

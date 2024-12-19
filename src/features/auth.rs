@@ -1,91 +1,68 @@
-use serenity::all::{ChannelId, GuildId, MessageId, MessageUpdateEvent, User};
-use serenity::async_trait;
-use serenity::model::channel::Message;
-use serenity::prelude::*;
+use poise::{say_reply, FrameworkError};
+use serenity::all::Mentionable;
 use tracing::error;
 
 use crate::config::get_config;
-use crate::utils::{create_message, get_message, react_from_id, send_message};
+use crate::features::PError;
+use crate::on_error;
+use crate::utils::{create_message, send_message};
 
-pub struct Handler;
+use super::PContext;
 
-impl Handler {
-    async fn handle_message(
-        &self,
-        ctx: &Context,
-        guild_id: GuildId,
-        channel_id: ChannelId,
-        message_id: MessageId,
-        author: User,
-        content: String,
-    ) {
-        let config = &get_config(ctx).await.auth;
-
-        if !config.trigger_regex.is_match(&content) {
-            return;
+async fn keyword_on_error(error: FrameworkError<'_, (), PError>) {
+    match error {
+        FrameworkError::Command { ctx, error, .. } => {
+            let _ = say_reply(ctx, "合言葉の確認中にエラーが発生しました。").await;
+            error!("Command error: {}", error);
         }
-
-        if channel_id != config.channel_id {
-            return;
+        error => {
+            let _ = on_error(error).await;
         }
-
-        let member = match guild_id.member(&ctx.http, author.id).await {
-            Ok(member) => member,
-            Err(why) => return error!("Failed to get member: {:?}", why),
-        };
-
-        react_from_id(ctx, channel_id, message_id, &config.authenticated_reaction).await;
-
-        if member.roles.contains(&config.role_id) {
-            error!("{} already has the role", member.user.name);
-            return;
-        }
-
-        if let Err(why) = member.add_role(&ctx.http, config.role_id).await {
-            let log = create_message(format!(
-                "{} にロールを追加できませんでした。\n```\n{}```",
-                member.mention(),
-                why
-            ));
-            let _ = send_message(ctx, &config.log_channel_id, log).await;
-            return error!("Failed to add role: {:?}", why);
-        }
-
-        let log = create_message(format!("{} にロールを追加しました。", member.mention()));
-        let _ = send_message(ctx, &config.log_channel_id, log).await;
     }
 }
 
-#[async_trait]
-impl EventHandler for Handler {
-    async fn message(&self, ctx: Context, msg: Message) {
-        let Some(guild_id) = msg.guild_id else {
-            return error!("Failed to get guild id: {:?}", msg);
-        };
+/// 合言葉を入力してください。
+#[poise::command(
+    slash_command,
+    ephemeral,
+    guild_only,
+    aliases("合言葉"),
+    on_error = "keyword_on_error",
+    required_bot_permissions = "MANAGE_ROLES"
+)]
+pub async fn keyword(ctx: PContext<'_>, #[description = "合言葉"] keyword: String) -> Result<(), PError> {
+    let config = &get_config(ctx.serenity_context()).await.auth;
 
-        self.handle_message(&ctx, guild_id, msg.channel_id, msg.id, msg.author, msg.content)
-            .await;
+    if !config.trigger_regex.is_match(&keyword) {
+        say_reply(ctx, "合言葉が間違っています。").await?;
+        return Ok(());
     }
 
-    async fn message_update(&self, ctx: Context, _: Option<Message>, _: Option<Message>, event: MessageUpdateEvent) {
-        let Some(guild_id) = event.guild_id else {
-            return error!("Failed to get guild id: {:?}", event);
-        };
-        let Some(author) = event.author else {
-            return error!("Failed to get author: {:?}", event);
-        };
-        if let Some(content) = event.content {
-            self.handle_message(&ctx, guild_id, event.channel_id, event.id, author, content)
-                .await;
-            return;
-        }
+    let member = ctx.author_member().await.unwrap();
 
-        match get_message(&ctx, event.channel_id, event.id).await {
-            Ok(m) => {
-                self.handle_message(&ctx, guild_id, event.channel_id, event.id, author, m.content)
-                    .await
-            }
-            Err(why) => error!("Failed to get message: {:?}", why),
-        }
+    if member.roles.contains(&config.role_id) {
+        error!("{} already has the role", member.user.name);
+        say_reply(ctx, "すでにロールを持っています。").await?;
+        return Ok(());
     }
+
+    if let Err(why) = member.add_role(&ctx.http(), config.role_id).await {
+        let log = create_message(format!(
+            "{} にロールを追加できませんでした。\n```\n{}```",
+            member.mention(),
+            why
+        ));
+        let _ = send_message(ctx.serenity_context(), &config.log_channel_id, log).await;
+        error!("Failed to add role: {:?}", why);
+        return Ok(());
+    }
+
+    let log = create_message(format!("{} にロールを追加しました。", member.mention()));
+    let _ = send_message(ctx.serenity_context(), &config.log_channel_id, log).await;
+    say_reply(
+        ctx,
+        "合言葉を確認しました。\nチャンネルが表示されない場合、アプリの再起動や再読み込み(Ctrl + R)をお試しください。",
+    )
+    .await?;
+    Ok(())
 }

@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use serenity::{
-    all::{CacheHttp, ChannelId, Context, CreateAllowedMentions, CreateMessage, Message, MessageId, ReactionType},
+    all::{ChannelId, Context, CreateAllowedMentions, CreateMessage, Message, MessageId},
     Result,
 };
 use similar::{Algorithm, ChangeTag, TextDiff};
@@ -38,20 +38,6 @@ pub async fn get_cached_message(ctx: &Context, channel_id: ChannelId, message_id
     }
 
     None
-}
-
-pub async fn get_message(ctx: &Context, channel_id: ChannelId, message_id: MessageId) -> Result<Message> {
-    if let Some(cached) = get_cached_message(ctx, channel_id, message_id).await {
-        return Ok(cached);
-    }
-
-    channel_id.message(&ctx.http, message_id).await
-}
-
-pub async fn react_from_id(ctx: &Context, channel_id: ChannelId, message_id: MessageId, reaction_type: &ReactionType) {
-    if let Err(why) = ctx.http().create_reaction(channel_id, message_id, reaction_type).await {
-        error!("Failed to react to message: {:?}", why);
-    }
 }
 
 pub fn create_diff_lines_text(old: &str, new: &str) -> String {

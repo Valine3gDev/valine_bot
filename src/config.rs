@@ -4,7 +4,7 @@ use regex::Regex;
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr};
 use serenity::{
-    all::{ChannelId, Context, GuildId, ReactionType, RoleId, UserId},
+    all::{ChannelId, Context, GuildId, RoleId, UserId},
     prelude::TypeMapKey,
 };
 
@@ -36,11 +36,8 @@ pub struct BotConfig {
 #[serde_as]
 #[derive(Debug, Deserialize)]
 pub struct AuthConfig {
-    pub channel_id: ChannelId,
     pub log_channel_id: ChannelId,
     pub role_id: RoleId,
-    #[serde_as(as = "DisplayFromStr")]
-    pub authenticated_reaction: ReactionType,
     #[serde_as(as = "DisplayFromStr")]
     pub trigger_regex: Regex,
 }
