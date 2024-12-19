@@ -123,6 +123,10 @@ impl Handler {
         color: i32,
         new_content: Option<String>,
     ) {
+        if message.author.bot {
+            return;
+        }
+
         let timestamp = FormattedTimestamp::new(Timestamp::now(), Some(FormattedTimestampStyle::LongDateTime));
         let description = MessageBuilder::new()
             .push_bold_safe("メンバー: ")

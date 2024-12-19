@@ -1,6 +1,7 @@
 
 [bot]
 token = "TOKEN"
+application_id = "000000000000000000"
 
 
 [auth]

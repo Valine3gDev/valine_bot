@@ -6,8 +6,14 @@ use std::{fs::read_to_string, sync::Arc};
 
 use bpaf::Bpaf;
 use config::Config;
-use features::{MessageCache, MessageCacheType};
-use serenity::{all::Ready, async_trait, cache::Settings as CacheSettings, prelude::*};
+use features::{commands, MessageCache, MessageCacheType, PError};
+use poise::{say_reply, Framework, FrameworkError, FrameworkOptions};
+use serenity::{
+    all::{MessageParseError, Ready},
+    async_trait,
+    cache::Settings as CacheSettings,
+    prelude::*,
+};
 use tracing::{error, info};
 
 struct MainHandler;
@@ -24,6 +30,42 @@ impl EventHandler for MainHandler {
 struct Options {
     #[bpaf(short, long)]
     check_config: bool,
+}
+
+pub async fn on_error(error: FrameworkError<'_, (), PError>) {
+    match error {
+        FrameworkError::ArgumentParse { ctx, input, error, .. } => {
+            let Some(input) = input else {
+                return error!("Error parsing input: {:?}", error);
+            };
+
+            let error = match error.downcast_ref::<MessageParseError>() {
+                Some(MessageParseError::Malformed) => {
+                    "メッセージとして解析できませんでした。\nメッセージID、メッセージURL形式で入力してください。"
+                }
+                Some(MessageParseError::Http(_)) => "メッセージを取得できませんでした。",
+                _ => &error.to_string(),
+            };
+
+            let _ = say_reply(ctx, format!("入力 `{}` の解析に失敗しました。\n{}", input, error)).await;
+        }
+        FrameworkError::MissingBotPermissions {
+            missing_permissions,
+            ctx,
+            ..
+        } => {
+            let msg = format!(
+                "ボットに権限が無いためコマンドを実行できません: {}",
+                missing_permissions,
+            );
+            let _ = say_reply(ctx, msg).await;
+        }
+        error => {
+            if let Err(e) = poise::builtins::on_error(error).await {
+                println!("Error while handling error: {}", e)
+            }
+        }
+    }
 }
 
 #[tokio::main]
@@ -45,10 +87,25 @@ async fn main() {
         return;
     }
 
+    let framework = Framework::builder()
+        .options(FrameworkOptions {
+            commands: commands(),
+            on_error: |error| Box::pin(on_error(error)),
+            ..Default::default()
+        })
+        .setup(|ctx, _ready, framework| {
+            Box::pin(async move {
+                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                Ok(())
+            })
+        })
+        .build();
+
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::GUILDS | GatewayIntents::MESSAGE_CONTENT;
     let mut settings = CacheSettings::default();
     settings.max_messages = 1_000_000;
     let mut client = Client::builder(&config.bot.token, intents)
+        .framework(framework)
         .event_handler(MainHandler)
         .event_handler(features::AuthHandler)
         .event_handler(features::LoggingHandler)

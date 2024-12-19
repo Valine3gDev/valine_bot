@@ -21,12 +21,12 @@ impl EventHandler for Handler {
             return;
         }
 
-        // 初期メッセージが送信されるか、1秒経つまで待機
+        // 初期メッセージが送信されるか、5秒経つまで待機
         let _ = thread
             .await_reply(&ctx.shard)
+            .channel_id(thread.id)
             .author_id(thread.owner_id.unwrap())
-            .timeout(Duration::from_secs(1))
-            .next()
+            .timeout(Duration::from_secs(5))
             .await;
 
         let config = &get_config(&ctx).await.thread_channel_startup;
