@@ -25,6 +25,7 @@ async fn pin_on_error(error: FrameworkError<'_, (), PError>) {
     context_menu_command = "ピン留め",
     slash_command,
     ephemeral,
+    guild_only,
     aliases("ピン留め"),
     on_error = "pin_on_error",
     required_bot_permissions = "MANAGE_MESSAGES"
