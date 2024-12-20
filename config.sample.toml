@@ -2,6 +2,7 @@
 [bot]
 token = "TOKEN"
 application_id = "000000000000000000"
+owners = ["000000000000000000"]
 
 
 [auth]
@@ -11,6 +12,8 @@ log_channel_id = "000000000000000000"
 role_id = "000000000000000000"
 # マッチしたら認証成功とする正規表現
 trigger_regex = "[おオｵ][のノﾉ][れレﾚ][GgＧｇ][RrＲｒ][EeＥｅ][GgＧｇ]"
+# オートコンプリートに表示されるダミーのキーワード
+dummy_keywords = ["ダミー", "dummy"]
 
 
 [message_logging]

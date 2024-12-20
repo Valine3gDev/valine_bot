@@ -1,5 +1,6 @@
 use poise::{say_reply, FrameworkError};
 use serenity::all::Mentionable;
+use serenity::futures::{self, Stream, StreamExt};
 use tracing::error;
 
 use crate::config::get_config;
@@ -7,18 +8,25 @@ use crate::features::PError;
 use crate::on_error;
 use crate::utils::{create_message, send_message};
 
-use super::PContext;
+use super::{CommandData, PContext};
 
-async fn keyword_on_error(error: FrameworkError<'_, (), PError>) {
+async fn keyword_on_error(error: FrameworkError<'_, CommandData, PError>) {
     match error {
         FrameworkError::Command { ctx, error, .. } => {
             let _ = say_reply(ctx, "合言葉の確認中にエラーが発生しました。").await;
-            error!("Command error: {}", error);
+            error!("Command error: {:?}", error);
         }
         error => {
             let _ = on_error(error).await;
         }
     }
+}
+
+async fn autocomplete_keyword<'a>(ctx: PContext<'_>, partial: &'a str) -> impl Stream<Item = String> + 'a {
+    let config = &get_config(ctx.serenity_context()).await.auth;
+    futures::stream::iter(config.dummy_keywords.clone())
+        .filter(move |name| futures::future::ready(name.starts_with(partial)))
+        .map(|name| name.to_string())
 }
 
 /// 合言葉を入力してください。
@@ -27,10 +35,16 @@ async fn keyword_on_error(error: FrameworkError<'_, (), PError>) {
     ephemeral,
     guild_only,
     aliases("合言葉"),
+    member_cooldown = 60,
     on_error = "keyword_on_error",
     required_bot_permissions = "MANAGE_ROLES"
 )]
-pub async fn keyword(ctx: PContext<'_>, #[description = "合言葉"] keyword: String) -> Result<(), PError> {
+pub async fn keyword(
+    ctx: PContext<'_>,
+    #[autocomplete = "autocomplete_keyword"]
+    #[description = "合言葉"]
+    keyword: String,
+) -> Result<(), PError> {
     let config = &get_config(ctx.serenity_context()).await.auth;
 
     if !config.trigger_regex.is_match(&keyword) {

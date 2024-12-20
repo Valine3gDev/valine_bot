@@ -1,3 +1,4 @@
+mod admin;
 mod auth;
 mod logging;
 mod message_cache;
@@ -11,11 +12,12 @@ pub use thread_channel_startup::Handler as ThreadChannelStartupHandler;
 pub use message_cache::{MessageCache, MessageCacheType};
 
 pub type PError = Box<dyn std::error::Error + Send + Sync>;
-pub type PContext<'a> = poise::Context<'a, (), PError>;
-pub type PCommand = poise::Command<(), PError>;
+pub struct CommandData {}
+pub type PContext<'a> = poise::Context<'a, CommandData, PError>;
+pub type PCommand = poise::Command<CommandData, PError>;
 
 pub fn commands() -> Vec<PCommand> {
-    build_commands(vec![auth::keyword, thread_pin::pin])
+    build_commands(vec![auth::keyword, thread_pin::pin, admin::reload_config])
 }
 
 fn alias_command(base: fn() -> PCommand, name: String) -> PCommand {

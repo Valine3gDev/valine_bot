@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use regex::Regex;
 use serde::Deserialize;
@@ -30,6 +30,7 @@ impl TypeMapKey for Config {
 #[derive(Debug, Deserialize)]
 pub struct BotConfig {
     pub token: String,
+    pub owners: HashSet<UserId>,
     pub application_id: UserId,
 }
 
@@ -40,6 +41,7 @@ pub struct AuthConfig {
     pub role_id: RoleId,
     #[serde_as(as = "DisplayFromStr")]
     pub trigger_regex: Regex,
+    pub dummy_keywords: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

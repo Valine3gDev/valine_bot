@@ -6,7 +6,7 @@ use std::{fs::read_to_string, sync::Arc};
 
 use bpaf::Bpaf;
 use config::Config;
-use features::{commands, MessageCache, MessageCacheType, PError};
+use features::{commands, CommandData, MessageCache, MessageCacheType, PError};
 use poise::{say_reply, Framework, FrameworkError, FrameworkOptions};
 use serenity::{
     all::{MessageParseError, Ready},
@@ -32,11 +32,11 @@ struct Options {
     check_config: bool,
 }
 
-pub async fn on_error(error: FrameworkError<'_, (), PError>) {
+pub async fn on_error(error: FrameworkError<'_, CommandData, PError>) {
     match error {
         FrameworkError::Command { error, ctx, .. } => {
             let _ = say_reply(ctx, "コマンド実行中にエラーが発生しました。").await;
-            error!("Command error: {}", error);
+            error!("Command error: {:?}", error);
         }
         FrameworkError::ArgumentParse { ctx, input, error, .. } => {
             let Some(input) = input else {
@@ -95,12 +95,14 @@ async fn main() {
         .options(FrameworkOptions {
             commands: commands(),
             on_error: |error| Box::pin(on_error(error)),
+            skip_checks_for_owners: true,
+            owners: config.bot.owners.clone(),
             ..Default::default()
         })
-        .setup(|ctx, _ready, framework| {
+        .setup(move |ctx, _ready, framework| {
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                Ok(())
+                Ok(CommandData {})
             })
         })
         .build();
