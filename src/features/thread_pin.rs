@@ -1,26 +1,13 @@
 use std::time::Duration;
 
-use poise::{say_reply, FrameworkError};
+use poise::say_reply;
 use serenity::{
     all::{Message, MessageType},
     futures::StreamExt,
 };
-use tracing::error;
 
 use super::PContext;
-use crate::{config::get_config, features::CommandData, on_error, PError};
-
-async fn pin_on_error(error: FrameworkError<'_, CommandData, PError>) {
-    match error {
-        FrameworkError::Command { ctx, error, .. } => {
-            let _ = say_reply(ctx, "ピン留め中にエラーが発生しました。").await;
-            error!("Command error: {:?}", error);
-        }
-        error => {
-            let _ = on_error(error).await;
-        }
-    }
-}
+use crate::{config::get_config, PError};
 
 /// スレッド主限定でメッセージをピン留めします。
 #[poise::command(
@@ -29,7 +16,6 @@ async fn pin_on_error(error: FrameworkError<'_, CommandData, PError>) {
     ephemeral,
     guild_only,
     aliases("ピン留め"),
-    on_error = "pin_on_error",
     required_bot_permissions = "MANAGE_MESSAGES"
 )]
 pub async fn pin(

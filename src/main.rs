@@ -36,7 +36,7 @@ pub async fn on_error(error: FrameworkError<'_, CommandData, PError>) {
     match error {
         FrameworkError::Command { error, ctx, .. } => {
             let _ = say_reply(ctx, "コマンド実行中にエラーが発生しました。").await;
-            error!("Command error: {:?}", error);
+            error!("Command error: Command: {:?}, Error: {:?}", ctx.command(), error);
         }
         FrameworkError::ArgumentParse { ctx, input, error, .. } => {
             let Some(input) = input else {
@@ -115,6 +115,7 @@ async fn main() {
         .event_handler(MainHandler)
         .event_handler(features::LoggingHandler)
         .event_handler(features::ThreadChannelStartupHandler)
+        .event_handler(features::QuestionHandler)
         .event_handler(features::MessageCacheHandler {
             disabled: config.message_cache.disabled,
         })

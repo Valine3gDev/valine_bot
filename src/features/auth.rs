@@ -1,26 +1,13 @@
-use poise::{say_reply, FrameworkError};
+use poise::say_reply;
 use serenity::all::Mentionable;
 use serenity::futures::{self, Stream, StreamExt};
 use tracing::error;
 
 use crate::config::get_config;
 use crate::features::PError;
-use crate::on_error;
 use crate::utils::{create_message, send_message};
 
-use super::{CommandData, PContext};
-
-async fn keyword_on_error(error: FrameworkError<'_, CommandData, PError>) {
-    match error {
-        FrameworkError::Command { ctx, error, .. } => {
-            let _ = say_reply(ctx, "合言葉の確認中にエラーが発生しました。").await;
-            error!("Command error: {:?}", error);
-        }
-        error => {
-            let _ = on_error(error).await;
-        }
-    }
-}
+use super::PContext;
 
 async fn autocomplete_keyword<'a>(ctx: PContext<'_>, partial: &'a str) -> impl Stream<Item = String> + 'a {
     let config = &get_config(ctx.serenity_context()).await.auth;
@@ -36,7 +23,6 @@ async fn autocomplete_keyword<'a>(ctx: PContext<'_>, partial: &'a str) -> impl S
     guild_only,
     aliases("合言葉"),
     member_cooldown = 60,
-    on_error = "keyword_on_error",
     required_bot_permissions = "MANAGE_ROLES"
 )]
 pub async fn keyword(

@@ -2,11 +2,13 @@ mod admin;
 mod auth;
 mod logging;
 mod message_cache;
+mod question;
 mod thread_channel_startup;
 mod thread_pin;
 
 pub use logging::Handler as LoggingHandler;
 pub use message_cache::Handler as MessageCacheHandler;
+pub use question::Handler as QuestionHandler;
 pub use thread_channel_startup::Handler as ThreadChannelStartupHandler;
 
 pub use message_cache::{MessageCache, MessageCacheType};
@@ -17,7 +19,12 @@ pub type PContext<'a> = poise::Context<'a, CommandData, PError>;
 pub type PCommand = poise::Command<CommandData, PError>;
 
 pub fn commands() -> Vec<PCommand> {
-    build_commands(vec![auth::keyword, thread_pin::pin, admin::reload_config])
+    build_commands(vec![
+        auth::keyword,
+        question::question,
+        thread_pin::pin,
+        admin::reload_config,
+    ])
 }
 
 fn alias_command(base: fn() -> PCommand, name: String) -> PCommand {

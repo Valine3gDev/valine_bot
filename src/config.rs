@@ -4,7 +4,7 @@ use regex::Regex;
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr};
 use serenity::{
-    all::{ChannelId, Context, GuildId, RoleId, UserId},
+    all::{ChannelId, Context, ForumTagId, GuildId, RoleId, UserId},
     prelude::TypeMapKey,
 };
 
@@ -21,6 +21,7 @@ pub struct Config {
     pub message_logging: MessageLoggingConfig,
     pub message_cache: MessageCacheConfig,
     pub thread_channel_startup: ThreadChannelStartupConfig,
+    pub question: QuestionConfig,
 }
 
 impl TypeMapKey for Config {
@@ -64,4 +65,11 @@ pub struct ThreadChannelStartupConfig {
 pub struct ThreadStartupConfig {
     pub channel_id: ChannelId,
     pub startup_message: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct QuestionConfig {
+    pub forum_id: ChannelId,
+    pub exclude_tags: Vec<ForumTagId>,
+    pub solved_tag: ForumTagId,
 }
