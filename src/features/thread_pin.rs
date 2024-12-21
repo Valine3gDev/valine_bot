@@ -6,8 +6,8 @@ use serenity::{
     futures::StreamExt,
 };
 
-use super::PContext;
-use crate::{config::get_config, PError};
+use crate::utils::has_authed_role;
+use crate::{config::get_config, PContext, PError};
 
 /// スレッド主限定でメッセージをピン留めします。
 #[poise::command(
@@ -16,7 +16,8 @@ use crate::{config::get_config, PError};
     ephemeral,
     guild_only,
     aliases("ピン留め"),
-    required_bot_permissions = "MANAGE_MESSAGES"
+    required_bot_permissions = "MANAGE_MESSAGES",
+    check = "has_authed_role"
 )]
 pub async fn pin(
     ctx: PContext<'_>,

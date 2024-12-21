@@ -8,7 +8,7 @@ use serenity::{
 use similar::{Algorithm, ChangeTag, TextDiff};
 use tracing::error;
 
-use crate::MessageCacheType;
+use crate::{config::get_config, error::BotError, MessageCacheType, PContext, PError};
 
 pub fn create_safe_message() -> CreateMessage {
     CreateMessage::new().allowed_mentions(CreateAllowedMentions::new().all_users(false))
@@ -51,6 +51,22 @@ pub async fn await_initial_message(ctx: &Context, thread: &GuildChannel) -> bool
         .timeout(Duration::from_secs(5))
         .await;
     false
+}
+
+/*
+認証済みロールを持っているかどうかを確認します。
+*/
+pub async fn has_authed_role(ctx: PContext<'_>) -> Result<bool, PError> {
+    let Some(member) = ctx.author_member().await else {
+        return Ok(false);
+    };
+
+    let config = &get_config(ctx.serenity_context()).await.auth;
+    if !member.roles.contains(&config.role_id) {
+        Err(BotError::HasNoRole.into())
+    } else {
+        Ok(true)
+    }
 }
 
 pub async fn send_message(ctx: &Context, channel_id: &ChannelId, builder: CreateMessage) -> Result<Message> {

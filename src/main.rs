@@ -1,4 +1,5 @@
 mod config;
+mod error;
 mod features;
 mod utils;
 
@@ -6,7 +7,7 @@ use std::{fs::read_to_string, sync::Arc};
 
 use bpaf::Bpaf;
 use config::Config;
-use features::{commands, CommandData, MessageCache, MessageCacheType, PError};
+use features::{commands, MessageCache, MessageCacheType};
 use poise::{say_reply, Framework, FrameworkError, FrameworkOptions};
 use serenity::{
     all::{MessageParseError, Ready},
@@ -15,6 +16,11 @@ use serenity::{
     prelude::*,
 };
 use tracing::{error, info};
+
+pub type PError = Box<dyn std::error::Error + Send + Sync>;
+pub struct CommandData {}
+pub type PContext<'a> = poise::Context<'a, CommandData, PError>;
+pub type PCommand = poise::Command<CommandData, PError>;
 
 struct MainHandler;
 
@@ -80,6 +86,13 @@ pub async fn on_error(error: FrameworkError<'_, CommandData, PError>) {
                 ),
             )
             .await;
+        }
+        FrameworkError::CommandCheckFailed { ctx, error, .. } => {
+            let error = match error {
+                Some(error) => error.to_string(),
+                None => "コマンドの実行条件を満たしていません。".to_string(),
+            };
+            let _ = say_reply(ctx, error).await;
         }
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {

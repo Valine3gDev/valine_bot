@@ -13,7 +13,8 @@ use crate::config::get_config;
 use crate::features::question::modal::{BasicQuestionData, DetailedQuestionData};
 use crate::features::question::question_creation_handler::{CustomIds, QuestionCreationHandler};
 use crate::features::question::QUESTION_CLOSE_PREFIX;
-use crate::features::{CommandData, PError};
+use crate::utils::has_authed_role;
+use crate::{CommandData, PError};
 
 fn reaction_from_forum_emoji(emoji: &ForumEmoji) -> Option<ReactionType> {
     match emoji.clone() {
@@ -62,7 +63,8 @@ fn create_select_menu(
     guild_only,
     aliases("質問開始"),
     member_cooldown = 60,
-    required_bot_permissions = "CREATE_PUBLIC_THREADS"
+    required_bot_permissions = "CREATE_PUBLIC_THREADS",
+    check = "has_authed_role"
 )]
 pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Result<(), PError> {
     let custom_ids = Arc::new(CustomIds::new(ctx.id()));

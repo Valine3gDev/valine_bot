@@ -15,10 +15,7 @@ pub use thread_channel_startup::Handler as ThreadChannelStartupHandler;
 
 pub use message_cache::{MessageCache, MessageCacheType};
 
-pub type PError = Box<dyn std::error::Error + Send + Sync>;
-pub struct CommandData {}
-pub type PContext<'a> = poise::Context<'a, CommandData, PError>;
-pub type PCommand = poise::Command<CommandData, PError>;
+use crate::PCommand;
 
 pub fn commands() -> Vec<PCommand> {
     build_commands(vec![

@@ -4,10 +4,8 @@ use serenity::futures::{self, Stream, StreamExt};
 use tracing::error;
 
 use crate::config::get_config;
-use crate::features::PError;
 use crate::utils::{create_message, send_message};
-
-use super::PContext;
+use crate::{PContext, PError};
 
 async fn autocomplete_keyword<'a>(ctx: PContext<'_>, partial: &'a str) -> impl Stream<Item = String> + 'a {
     let config = &get_config(ctx.serenity_context()).await.auth;
