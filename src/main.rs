@@ -67,6 +67,20 @@ pub async fn on_error(error: FrameworkError<'_, CommandData, PError>) {
         FrameworkError::NotAnOwner { ctx, .. } => {
             let _ = say_reply(ctx, "このコマンドはボットのオーナーのみ実行できます。").await;
         }
+        FrameworkError::CooldownHit {
+            remaining_cooldown,
+            ctx,
+            ..
+        } => {
+            let _ = say_reply(
+                ctx,
+                format!(
+                    "このコマンドはクールダウン中です。残り時間: {}秒",
+                    remaining_cooldown.as_secs()
+                ),
+            )
+            .await;
+        }
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {
                 println!("Error while handling error: {}", e)

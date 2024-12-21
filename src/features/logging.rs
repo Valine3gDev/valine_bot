@@ -173,12 +173,12 @@ impl Handler {
 impl EventHandler for Handler {
     async fn message_update(&self, ctx: Context, old: Option<Message>, _: Option<Message>, event: MessageUpdateEvent) {
         let Some(message) = get_cached_message(&ctx, event.channel_id, event.id).await else {
-            return error!("Failed to get message: {:?}", event.id);
+            return error!("Failed to get message: {}", event.id);
         };
         let message = old.unwrap_or(message);
 
         let Ok(new_message) = event.channel_id.message(&ctx.http, event.id).await else {
-            return error!("Failed to get new message: {:?}", event.id);
+            return error!("Failed to get new message: {}", event.id);
         };
 
         if message.content == new_message.content {
@@ -204,7 +204,7 @@ impl EventHandler for Handler {
         _: Option<GuildId>,
     ) {
         let Some(message) = get_cached_message(&ctx, channel_id, deleted_message_id).await else {
-            return error!("Failed to get message: {:?}", deleted_message_id);
+            return error!("Failed to get message: {}", deleted_message_id);
         };
 
         self.create_and_send_log(&ctx, &message, "メッセージ削除ログ", 0xf00000, None)
