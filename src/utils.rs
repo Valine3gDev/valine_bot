@@ -1,6 +1,8 @@
+use std::time::Duration;
+
 use itertools::Itertools;
 use serenity::{
-    all::{ChannelId, Context, CreateAllowedMentions, CreateMessage, Message, MessageId},
+    all::{ChannelId, Context, CreateAllowedMentions, CreateMessage, GuildChannel, Message, MessageId},
     Result,
 };
 use similar::{Algorithm, ChangeTag, TextDiff};
@@ -14,6 +16,41 @@ pub fn create_safe_message() -> CreateMessage {
 
 pub fn create_message(content: impl Into<String>) -> CreateMessage {
     create_safe_message().content(content)
+}
+
+/**
+thread_create イベントにおいて、初期メッセージが送信されるか5秒経過するまで待機する
+
+初期メッセージが送信されると、falseを返し、既に初期メッセージが存在する場合、true を返す
+```rs
+pub struct Handler;
+
+#[async_trait]
+impl EventHandler for Handler {
+    async fn thread_create(&self, ctx: Context, thread: GuildChannel) {
+        if await_thread_create(&ctx, &thread).await {
+            return;
+        }
+
+        // 処理
+    }
+}
+```
+ */
+pub async fn await_initial_message(ctx: &Context, thread: &GuildChannel) -> bool {
+    // Botがメッセージを送信すると二度イベントが発火するので、初期メッセージ送信後のイベントは無視する
+    if thread.last_message_id.is_some() {
+        return true;
+    }
+
+    // 初期メッセージが送信されるか、5秒経つまで待機
+    thread
+        .await_reply(&ctx.shard)
+        .channel_id(thread.id)
+        .author_id(thread.owner_id.unwrap())
+        .timeout(Duration::from_secs(5))
+        .await;
+    false
 }
 
 pub async fn send_message(ctx: &Context, channel_id: &ChannelId, builder: CreateMessage) -> Result<Message> {
