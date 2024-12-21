@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 #[derive(Debug, Clone, poise::Modal)]
+#[name = "質問の基本情報を入力"]
 pub struct BasicQuestionData {
     #[name = "質問のタイトル (わかりやすいように質問内容を要約してください)"]
     #[placeholder = "質問のタイトルを入力してください"]
@@ -35,6 +36,7 @@ impl Display for BasicQuestionData {
 }
 
 #[derive(Debug, Clone, poise::Modal)]
+#[name = "質問の詳細情報を入力"]
 pub struct DetailedQuestionData {
     #[name = "質問の内容 (詳細な質問内容を入力してください)"]
     #[placeholder = "質問の内容を入力してください"]
