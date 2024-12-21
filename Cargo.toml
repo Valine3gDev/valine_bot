@@ -7,7 +7,8 @@ edition = "2021"
 
 [dependencies]
 serenity = "0.12.4"
-poise = "0.6"
+# Git 上では修正されているが、crates.io にはまだ反映されていないため、git で指定
+poise = { git = "https://github.com/serenity-rs/poise", rev = "db10b126c8b07f7e1924cba1672f04ff24ed4ec7" }
 regex = "1.0"
 similar = "2.6.0"
 dashmap = "6.1.0"
