@@ -117,6 +117,7 @@ async fn main() {
         .framework(framework)
         .event_handler(MainHandler)
         .event_handler(features::LoggingHandler)
+        .event_handler(features::ThreadAutoInviteHandler)
         .event_handler(features::ThreadChannelStartupHandler)
         .event_handler(features::QuestionHandler)
         .event_handler(features::MessageCacheHandler {

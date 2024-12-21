@@ -21,6 +21,7 @@ pub struct Config {
     pub message_logging: MessageLoggingConfig,
     pub message_cache: MessageCacheConfig,
     pub thread_channel_startup: ThreadChannelStartupConfig,
+    pub thread_auto_invite: ThreadAutoInviteConfig,
     pub question: QuestionConfig,
 }
 
@@ -59,6 +60,11 @@ pub struct MessageCacheConfig {
 #[derive(Debug, Deserialize)]
 pub struct ThreadChannelStartupConfig {
     pub threads: Vec<ThreadStartupConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ThreadAutoInviteConfig {
+    pub role_id: RoleId,
 }
 
 #[derive(Debug, Deserialize)]
