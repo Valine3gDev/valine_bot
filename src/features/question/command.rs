@@ -3,8 +3,7 @@ use serenity::all::{
     ButtonStyle, Channel, CreateActionRow, CreateButton, CreateForumPost, CreateMessage, CreateSelectMenu,
     CreateSelectMenuKind, CreateSelectMenuOption, ForumEmoji, ForumTag, ForumTagId, MessageBuilder, ReactionType,
 };
-use serenity::futures::lock::Mutex;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use tracing::debug;
 
 use std::sync::Arc;
@@ -102,9 +101,9 @@ pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Resul
         ]))
         .await?;
 
-    let basic_data = Arc::new(Mutex::new(None::<BasicQuestionData>));
-    let detailed_data = Arc::new(Mutex::new(None::<DetailedQuestionData>));
-    let forum_tag_ids = Arc::new(Mutex::new(Vec::<ForumTagId>::new()));
+    let basic_data = Arc::new(RwLock::new(None::<BasicQuestionData>));
+    let detailed_data = Arc::new(RwLock::new(None::<DetailedQuestionData>));
+    let forum_tag_ids = Arc::new(RwLock::new(Vec::<ForumTagId>::new()));
 
     let (submit_tx, mut submit_rx) = mpsc::channel::<()>(1);
     let (inputted_tx, mut inputted_rx) = mpsc::channel::<()>(1);
@@ -129,6 +128,7 @@ pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Resul
         debug!("inputted_rx closed");
         return Ok(());
     }
+    inputted_rx.close();
 
     const CONFIRM: &str = "情報が入力されました、内容を確認し問題なければ「質問を送信」ボタンをクリックしてください。\n### この機能で作成されるフォームは編集出来ません、間違いが無いように気をつけてください。";
     message
@@ -141,7 +141,7 @@ pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Resul
                         &custom_ids.select_tag,
                         &channel.available_tags,
                         &config.exclude_tags,
-                        &forum_tag_ids.lock().await.clone(),
+                        &forum_tag_ids.read().await,
                     ),
                     CreateActionRow::Buttons({
                         let mut c = buttons.clone();
@@ -156,10 +156,11 @@ pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Resul
         debug!("submit_rx closed");
         return Ok(());
     }
+    submit_rx.close();
 
-    let basic_data = basic_data.lock().await.clone().unwrap();
-    let detailed_data = detailed_data.lock().await.clone().unwrap();
-    let forum_tag_ids = forum_tag_ids.lock().await.clone();
+    let basic_data = basic_data.read().await.clone().unwrap();
+    let detailed_data = detailed_data.read().await.clone().unwrap();
+    let forum_tag_ids = forum_tag_ids.read().await;
 
     let msg = MessageBuilder::new()
         .push_line(basic_data.to_string())
@@ -182,7 +183,7 @@ pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Resul
                     .label("質問を解決済みにする")
                     .style(ButtonStyle::Danger)])]),
             )
-            .set_applied_tags(forum_tag_ids),
+            .set_applied_tags(&*forum_tag_ids),
         )
         .await?;
 

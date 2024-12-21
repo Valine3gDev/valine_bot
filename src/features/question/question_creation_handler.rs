@@ -6,10 +6,10 @@ use serenity::{
         CacheHttp, CommandInteraction, ComponentInteraction, ComponentInteractionCollector,
         ComponentInteractionDataKind, Context, ForumTagId, ModalInteractionCollector, ModalInteractionData,
     },
-    futures::{lock::Mutex, StreamExt},
+    futures::StreamExt,
 };
-use tokio::sync::mpsc;
-use tracing::{debug, error};
+use tokio::sync::{mpsc, RwLock};
+use tracing::error;
 
 use super::modal::{BasicQuestionData, DetailedQuestionData};
 
@@ -47,20 +47,24 @@ pub struct QuestionCreationHandler {
     pub ctx: Context,
     pub interaction: CommandInteraction,
     pub custom_ids: Arc<CustomIds>,
-    pub basic_data: Arc<Mutex<Option<BasicQuestionData>>>,
-    pub detailed_data: Arc<Mutex<Option<DetailedQuestionData>>>,
-    pub forum_tag_ids: Arc<Mutex<Vec<ForumTagId>>>,
+    pub basic_data: Arc<RwLock<Option<BasicQuestionData>>>,
+    pub detailed_data: Arc<RwLock<Option<DetailedQuestionData>>>,
+    pub forum_tag_ids: Arc<RwLock<Vec<ForumTagId>>>,
     pub submit_tx: mpsc::Sender<()>,
     pub inputted_tx: mpsc::Sender<()>,
 }
 
 impl QuestionCreationHandler {
     async fn enable_button(&self) {
-        let has_basic_data = self.basic_data.lock().await.is_some();
-        let has_detailed_data = self.detailed_data.lock().await.is_some();
-        let has_forum_tag_ids = !self.forum_tag_ids.lock().await.is_empty();
+        if self.inputted_tx.is_closed() {
+            return;
+        }
 
-        if has_basic_data && has_detailed_data && has_forum_tag_ids && !self.inputted_tx.is_closed() {
+        let has_basic_data = self.basic_data.read().await.is_some();
+        let has_detailed_data = self.detailed_data.read().await.is_some();
+        let has_forum_tag_ids = !self.forum_tag_ids.try_read().unwrap().is_empty();
+
+        if has_basic_data && has_detailed_data && has_forum_tag_ids {
             self.inputted_tx.send(()).await.unwrap();
         }
     }
@@ -87,7 +91,6 @@ impl QuestionCreationHandler {
         let self_clone = self.clone();
         tokio::spawn(async move {
             self_clone._handle_component_interaction().await;
-            debug!("component interaction end");
         });
     }
 
@@ -97,16 +100,12 @@ impl QuestionCreationHandler {
             .timeout(TIMEOUT)
             .stream();
         let http = self.ctx.http();
-        loop {
-            let Some(interaction) = stream.next().await else {
-                break;
-            };
-
+        while let Some(interaction) = stream.next().await {
             match interaction.data.custom_id {
                 ref x if x == &self.custom_ids.basic => {
                     self.send_modal::<BasicQuestionData>(
                         &interaction,
-                        self.basic_data.lock().await.clone(),
+                        self.basic_data.read().await.clone(),
                         &self.custom_ids.basic,
                     )
                     .await
@@ -114,16 +113,15 @@ impl QuestionCreationHandler {
                 ref x if x == &self.custom_ids.detailed => {
                     self.send_modal::<DetailedQuestionData>(
                         &interaction,
-                        Some(self.detailed_data.lock().await.clone().unwrap_or_default()),
+                        Some(self.detailed_data.read().await.clone().unwrap_or_default()),
                         &self.custom_ids.detailed,
                     )
-                    .await
+                    .await;
                 }
                 ref x if x == &self.custom_ids.select_tag => {
                     if let ComponentInteractionDataKind::StringSelect { ref values } = interaction.data.kind {
-                        let mut tags = self.forum_tag_ids.lock().await;
-                        tags.clear();
-                        tags.extend(values.iter().map(|x| ForumTagId::from_str(x).unwrap()));
+                        let mut tags = self.forum_tag_ids.write().await;
+                        *tags = values.iter().map(|x| ForumTagId::from_str(x).unwrap()).collect();
                         interaction.defer(http).await.unwrap();
                     };
                 }
@@ -146,7 +144,6 @@ impl QuestionCreationHandler {
         let self_clone = self.clone();
         tokio::spawn(async move {
             self_clone._handle_modal_interaction().await;
-            debug!("modal interaction end");
         });
     }
 
@@ -161,11 +158,11 @@ impl QuestionCreationHandler {
         } {
             match res.data.custom_id {
                 ref x if x == &self.custom_ids.basic => {
-                    let mut data = self.basic_data.lock().await;
+                    let mut data = self.basic_data.write().await;
                     *data = self.parse_response::<BasicQuestionData>(&res.data).await;
                 }
                 ref x if x == &self.custom_ids.detailed => {
-                    let mut data = self.detailed_data.lock().await;
+                    let mut data = self.detailed_data.write().await;
                     *data = self.parse_response::<DetailedQuestionData>(&res.data).await;
                 }
                 _ => {}
