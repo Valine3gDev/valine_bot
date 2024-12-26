@@ -24,9 +24,20 @@ pub async fn pin(
     #[description = "ピン留めするメッセージ (リンクかID)"] msg: Message,
 ) -> Result<(), PError> {
     let channel = ctx.guild_channel().await.unwrap();
-    let Some(owner) = channel.owner_id else {
-        say_reply(ctx, "スレッド以外のチャンネルでは使用出来ません。").await?;
-        return Ok(());
+    let config = get_config(ctx.serenity_context()).await;
+
+    let owner = match (
+        channel.owner_id,
+        channel.parent_id.unwrap_or_default() == config.question.forum_id,
+    ) {
+        // 質問フォーラムの場合、初期メッセージのメンションからスレッド主を取得
+        // スレッドの初期メッセージのIDはスレッドのIDと同じ
+        (_, true) => channel.message(ctx, channel.id.get()).await?.mentions[0].id,
+        (Some(owner), false) => owner,
+        (None, _) => {
+            say_reply(ctx, "スレッド以外のチャンネルでは使用出来ません。").await?;
+            return Ok(());
+        }
     };
 
     if ctx.author().id != owner {
@@ -34,12 +45,11 @@ pub async fn pin(
         return Ok(());
     }
 
-    let bot_id = get_config(ctx.serenity_context()).await.bot.application_id;
     let mut stream = channel
         .await_reply(&ctx.serenity_context().shard)
         .timeout(Duration::from_secs(5))
         .channel_id(channel.id)
-        .author_id(bot_id)
+        .author_id(config.bot.application_id)
         .filter(|r| r.kind == MessageType::PinsAdd)
         .stream();
 
