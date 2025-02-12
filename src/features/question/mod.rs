@@ -8,14 +8,13 @@ pub use command::question;
 use serenity::{
     all::{
         ButtonStyle, CacheHttp, Channel, ComponentInteractionCollector, ComponentInteractionDataKind, Context,
-        CreateActionRow, CreateButton, CreateInteractionResponse, CreateInteractionResponseMessage,
-        EditInteractionResponse, EditThread, EventHandler, Interaction, UserId,
+        CreateActionRow, CreateButton, EditInteractionResponse, EditThread, EventHandler, Interaction, UserId,
     },
     async_trait,
 };
 use tracing::error;
 
-use crate::config::get_config;
+use crate::{config::get_config, utils::create_interaction_message};
 
 pub static QUESTION_CLOSE_PREFIX: &str = "close_question_forum";
 
@@ -47,14 +46,7 @@ impl EventHandler for Handler {
         };
         if channel.applied_tags.contains(&config.solved_tag) {
             let _ = interaction
-                .create_response(
-                    ctx.http(),
-                    CreateInteractionResponse::Message(
-                        CreateInteractionResponseMessage::new()
-                            .content("既に解決済みです。")
-                            .ephemeral(true),
-                    ),
-                )
+                .create_response(ctx.http(), create_interaction_message("既に解決済みです。", true, None))
                 .await;
         }
 
@@ -64,26 +56,22 @@ impl EventHandler for Handler {
         let _ = interaction
             .create_response(
                 ctx.http(),
-                CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new()
-                        .content("本当に質問を終了しますか？")
-                        .ephemeral(true)
-                        .components(
-                            [CreateActionRow::Buttons(
-                                [
-                                    CreateButton::new(&confirm_custom_id)
-                                        .label("はい")
-                                        .emoji('✅')
-                                        .style(ButtonStyle::Danger),
-                                    CreateButton::new(&cancel_custom_id)
-                                        .label("いいえ")
-                                        .emoji('❎')
-                                        .style(ButtonStyle::Success),
-                                ]
-                                .to_vec(),
-                            )]
-                            .to_vec(),
-                        ),
+                create_interaction_message(
+                    "本当に質問を終了しますか？",
+                    true,
+                    Some(vec![CreateActionRow::Buttons(
+                        [
+                            CreateButton::new(&confirm_custom_id)
+                                .label("はい")
+                                .emoji('✅')
+                                .style(ButtonStyle::Danger),
+                            CreateButton::new(&cancel_custom_id)
+                                .label("いいえ")
+                                .emoji('❎')
+                                .style(ButtonStyle::Success),
+                        ]
+                        .to_vec(),
+                    )]),
                 ),
             )
             .await;

@@ -7,10 +7,11 @@ use std::{fs::read_to_string, sync::Arc};
 
 use bpaf::Bpaf;
 use config::Config;
+use error::on_error;
 use features::{commands, MessageCache, MessageCacheType};
-use poise::{say_reply, Framework, FrameworkError, FrameworkOptions};
+use poise::{Framework, FrameworkOptions};
 use serenity::{
-    all::{MessageParseError, RatelimitInfo, Ready},
+    all::{RatelimitInfo, Ready},
     async_trait,
     cache::Settings as CacheSettings,
     prelude::*,
@@ -40,70 +41,6 @@ impl EventHandler for MainHandler {
 struct Options {
     #[bpaf(short, long)]
     check_config: bool,
-}
-
-pub async fn on_error(error: FrameworkError<'_, CommandData, PError>) {
-    match error {
-        FrameworkError::Command { error, ctx, .. } => {
-            let _ = say_reply(ctx, "コマンド実行中にエラーが発生しました。").await;
-            error!("Command error: Command: {:?}, Error: {:?}", ctx.command(), error);
-        }
-        FrameworkError::ArgumentParse { ctx, input, error, .. } => {
-            let Some(input) = input else {
-                return error!("Error parsing input: {:?}", error);
-            };
-
-            let error = match error.downcast_ref::<MessageParseError>() {
-                Some(MessageParseError::Malformed) => {
-                    "メッセージとして解析できませんでした。\nメッセージID、メッセージURL形式で入力してください。"
-                }
-                Some(MessageParseError::Http(_)) => "メッセージを取得できませんでした。",
-                _ => &error.to_string(),
-            };
-
-            let _ = say_reply(ctx, format!("入力 `{}` の解析に失敗しました。\n{}", input, error)).await;
-        }
-        FrameworkError::MissingBotPermissions {
-            missing_permissions,
-            ctx,
-            ..
-        } => {
-            let msg = format!(
-                "ボットに権限が無いためコマンドを実行できません: {}",
-                missing_permissions,
-            );
-            let _ = say_reply(ctx, msg).await;
-        }
-        FrameworkError::NotAnOwner { ctx, .. } => {
-            let _ = say_reply(ctx, "このコマンドはボットのオーナーのみ実行できます。").await;
-        }
-        FrameworkError::CooldownHit {
-            remaining_cooldown,
-            ctx,
-            ..
-        } => {
-            let _ = say_reply(
-                ctx,
-                format!(
-                    "このコマンドはクールダウン中です。残り時間: {}秒",
-                    remaining_cooldown.as_secs()
-                ),
-            )
-            .await;
-        }
-        FrameworkError::CommandCheckFailed { ctx, error, .. } => {
-            let error = match error {
-                Some(error) => error.to_string(),
-                None => "コマンドの実行条件を満たしていません。".to_string(),
-            };
-            let _ = say_reply(ctx, error).await;
-        }
-        error => {
-            if let Err(e) = poise::builtins::on_error(error).await {
-                println!("Error while handling error: {}", e)
-            }
-        }
-    }
 }
 
 #[tokio::main]
@@ -147,13 +84,12 @@ async fn main() {
     let mut client = Client::builder(&config.bot.token, intents)
         .framework(framework)
         .event_handler(MainHandler)
+        .event_handler(features::AuthHandler::new())
         .event_handler(features::LoggingHandler)
         .event_handler(features::ThreadAutoInviteHandler)
         .event_handler(features::ThreadChannelStartupHandler)
         .event_handler(features::QuestionHandler)
-        .event_handler(features::MessageCacheHandler {
-            disabled: config.message_cache.disabled,
-        })
+        .event_handler(features::MessageCacheHandler::new(config.message_cache.disabled))
         .cache_settings(settings)
         .type_map_insert::<MessageCacheType>(Arc::new(MessageCache::new()))
         .type_map_insert::<Config>(Arc::new(config))

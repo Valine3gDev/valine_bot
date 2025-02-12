@@ -7,6 +7,7 @@ mod thread_auto_invite;
 mod thread_channel_startup;
 mod thread_pin;
 
+pub use auth::Handler as AuthHandler;
 pub use logging::Handler as LoggingHandler;
 pub use message_cache::Handler as MessageCacheHandler;
 pub use question::Handler as QuestionHandler;
@@ -19,7 +20,7 @@ use crate::PCommand;
 
 pub fn commands() -> Vec<PCommand> {
     build_commands(vec![
-        auth::keyword,
+        auth::create_keyword_button,
         question::question,
         thread_pin::pin,
         admin::reload_config,

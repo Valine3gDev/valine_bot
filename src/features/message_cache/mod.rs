@@ -16,10 +16,14 @@ use crate::{
 };
 
 pub struct Handler {
-    pub disabled: bool,
+    disabled: bool,
 }
 
 impl Handler {
+    pub fn new(disabled: bool) -> Self {
+        Self { disabled }
+    }
+
     async fn cache_channel_message(
         &self,
         ctx: &Context,

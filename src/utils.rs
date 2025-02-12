@@ -5,8 +5,9 @@ use futures::Stream;
 use itertools::Itertools;
 use serenity::{
     all::{
-        ChannelId, Context, CreateAllowedMentions, CreateMessage, GuildChannel, Http, LightMethod, Message, MessageId,
-        Request, Route, ThreadsData, Timestamp,
+        ChannelId, Context, CreateActionRow, CreateAllowedMentions, CreateInteractionResponse,
+        CreateInteractionResponseMessage, CreateMessage, GuildChannel, Http, LightMethod, Message, MessageId, Request,
+        Route, ThreadsData, Timestamp,
     },
     Result,
 };
@@ -21,6 +22,22 @@ pub fn create_safe_message() -> CreateMessage {
 
 pub fn create_message(content: impl Into<String>) -> CreateMessage {
     create_safe_message().content(content)
+}
+
+pub fn create_interaction_message(
+    content: impl Into<String>,
+    ephemeral: bool,
+    components: Option<Vec<CreateActionRow>>,
+) -> CreateInteractionResponse {
+    let mut msg = CreateInteractionResponseMessage::new()
+        .content(content)
+        .ephemeral(ephemeral);
+
+    if let Some(components) = components {
+        msg = msg.components(components);
+    }
+
+    CreateInteractionResponse::Message(msg)
 }
 
 /**
