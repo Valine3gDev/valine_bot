@@ -10,7 +10,7 @@ use config::Config;
 use features::{commands, MessageCache, MessageCacheType};
 use poise::{say_reply, Framework, FrameworkError, FrameworkOptions};
 use serenity::{
-    all::{MessageParseError, Ready},
+    all::{MessageParseError, RatelimitInfo, Ready},
     async_trait,
     cache::Settings as CacheSettings,
     prelude::*,
@@ -28,6 +28,10 @@ struct MainHandler;
 impl EventHandler for MainHandler {
     async fn ready(&self, _: Context, ready: Ready) {
         info!("{} is connected!", ready.user.name);
+    }
+
+    async fn ratelimit(&self, data: RatelimitInfo) {
+        info!("Ratelimited {}: {}s", data.path, data.timeout.as_secs());
     }
 }
 

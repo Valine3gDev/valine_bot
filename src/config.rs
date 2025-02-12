@@ -54,7 +54,9 @@ pub struct MessageLoggingConfig {
 #[derive(Debug, Deserialize)]
 pub struct MessageCacheConfig {
     pub disabled: bool,
+    pub limit: usize,
     pub target_guild_ids: Vec<GuildId>,
+    pub ignore_channel_ids: Vec<ChannelId>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -3,13 +3,9 @@ use std::{collections::HashMap, sync::Arc};
 use dashmap::DashMap;
 use itertools::Itertools;
 use serenity::{
-    all::{ChannelId, Context, EventHandler, GetMessages, GuildId, Message, MessageId},
-    async_trait,
+    all::{ChannelId, Message, MessageId},
     prelude::TypeMapKey,
 };
-use tracing::{error, info};
-
-use crate::config::get_config;
 
 pub struct MessageCache {
     cache: DashMap<ChannelId, HashMap<MessageId, Message>>,
@@ -67,43 +63,4 @@ pub struct MessageCacheType;
 
 impl TypeMapKey for MessageCacheType {
     type Value = Arc<MessageCache>;
-}
-
-pub struct Handler {
-    pub disabled: bool,
-}
-
-#[async_trait]
-impl EventHandler for Handler {
-    async fn cache_ready(&self, ctx: Context, _: Vec<GuildId>) {
-        if self.disabled {
-            return;
-        }
-
-        let config = get_config(&ctx).await;
-        for guild in &config.message_cache.target_guild_ids {
-            let Ok(channels) = guild.channels(&ctx.http).await else {
-                error!("Failed to get channels for guild: {:?}", guild);
-                continue;
-            };
-
-            for (id, channel) in channels {
-                if !channel.is_text_based() {
-                    continue;
-                }
-
-                let Ok(messages) = channel.messages(&ctx.http, GetMessages::new().limit(100)).await else {
-                    info!("Failed to get messages for channel: {:?}", channel.name);
-                    continue;
-                };
-
-                let mut data = ctx.data.write().await;
-                let cache = data.get_mut::<MessageCacheType>().unwrap();
-                let len = messages.len();
-                cache.extend_messages(messages);
-                info!("Cached {} messages for channel: {} ({})", len, channel.name, id);
-            }
-        }
-        info!("Cache ready!");
-    }
 }
