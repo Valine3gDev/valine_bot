@@ -1,0 +1,17 @@
+[formatting]
+column_width = 120
+compact_arrays = false
+compact_entries = false
+compact_inline_tables = false
+reorder_keys = false
+
+
+[[rule]]
+include = [ "**/Cargo.toml" ]
+keys = [ "dependencies" ]
+
+[[rule]]
+include = [ "taplo.toml" ]
+
+[rule.formatting]
+reorder_keys = true

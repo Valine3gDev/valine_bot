@@ -2,7 +2,7 @@
 [bot]
 token = "TOKEN"
 application_id = "000000000000000000"
-owners = ["000000000000000000"]
+owners = [ "000000000000000000" ]
 
 
 [auth]
@@ -13,7 +13,7 @@ role_id = "000000000000000000"
 # マッチしたら認証成功とする正規表現
 trigger_regex = "[おオｵ][のノﾉ][れレﾚ][GgＧｇ][RrＲｒ][EeＥｅ][GgＧｇ]"
 # モーダルのデフォルト値にランダムに選択させるダミーのキーワード郡
-dummy_keywords = ["ダミー", "dummy"]
+dummy_keywords = [ "ダミー", "dummy" ]
 
 
 [auto_kick]
@@ -40,9 +40,9 @@ disabled = false
 limit = 1000
 # 過去のメッセージのキャッシュを取るギルドIDのリスト
 # target_guild_ids = ["651286346861641735"]
-target_guild_ids = ["000000000000000000"]
+target_guild_ids = [ "000000000000000000" ]
 # 過去メッセージのキャッシュ取らないチャンネルIDのリスト、親チャンネルを指定すると子のチャンネルも対象 (孫は対象外)
-ignore_channel_ids = ["000000000000000000"]
+ignore_channel_ids = [ "000000000000000000" ]
 
 
 [thread_channel_startup]
@@ -66,4 +66,4 @@ forum_id = "000000000000000000"
 # 解決済みのタグID
 solved_tag = "000000000000000000"
 # 除外するタグIDのリスト
-exclude_tags = ["000000000000000000"]
+exclude_tags = [ "000000000000000000" ]
