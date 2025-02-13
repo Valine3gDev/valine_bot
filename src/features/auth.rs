@@ -6,8 +6,8 @@ use poise::say_reply;
 use rand::seq::IndexedRandom;
 use serenity::all::{
     ActionRowComponent, ButtonStyle, ComponentInteractionDataKind, Context, CreateActionRow, CreateButton,
-    CreateInputText, CreateInteractionResponse, CreateInteractionResponseFollowup, CreateModal, EventHandler,
-    InputTextStyle, Interaction, Mentionable, ModalInteractionCollector, Ready, UserId,
+    CreateInputText, CreateInteractionResponse, CreateInteractionResponseFollowup, CreateModal, EmbedMessageBuilding,
+    EventHandler, InputTextStyle, Interaction, Mentionable, MessageBuilder, ModalInteractionCollector, Ready, UserId,
 };
 use serenity::async_trait;
 use tracing::error;
@@ -141,7 +141,17 @@ impl EventHandler for Handler {
             return error!("Failed to add role: {:?}", why);
         }
 
-        let log = create_message(format!("{} にロールを追加しました。", member.mention()));
+        let log = create_message(
+            MessageBuilder::new()
+                .push_named_link_safe(
+                    member.display_name(),
+                    format!("<https://discord.com/users/{}>", member.user.id),
+                )
+                .push(" (")
+                .push_mono(member.user.id.to_string())
+                .push(") にロールを追加しました。")
+                .build(),
+        );
         let _ = send_message(&ctx, &config.log_channel_id, log).await;
 
         const AUTH_SUCCESS_MESSAGE: &str = "合言葉を確認しました。\nチャンネルが表示されない場合、アプリの再起動や再読み込み(Ctrl + R)をお試しください。";

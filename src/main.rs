@@ -85,6 +85,7 @@ async fn main() {
         .framework(framework)
         .event_handler(MainHandler)
         .event_handler(features::AuthHandler::new())
+        .event_handler(features::AutoKickHandler)
         .event_handler(features::LoggingHandler)
         .event_handler(features::ThreadAutoInviteHandler)
         .event_handler(features::ThreadChannelStartupHandler)

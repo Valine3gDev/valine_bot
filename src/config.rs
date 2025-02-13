@@ -1,5 +1,7 @@
 use std::{collections::HashSet, sync::Arc};
 
+use chrono::Duration;
+use duration_str::deserialize_duration_chrono;
 use regex::Regex;
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr};
@@ -18,6 +20,7 @@ pub async fn get_config(ctx: &Context) -> Arc<Config> {
 pub struct Config {
     pub bot: BotConfig,
     pub auth: AuthConfig,
+    pub auto_kick: AutoKickConfig,
     pub message_logging: MessageLoggingConfig,
     pub message_cache: MessageCacheConfig,
     pub thread_channel_startup: ThreadChannelStartupConfig,
@@ -80,4 +83,12 @@ pub struct QuestionConfig {
     pub forum_id: ChannelId,
     pub exclude_tags: Vec<ForumTagId>,
     pub solved_tag: ForumTagId,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AutoKickConfig {
+    pub guild_id: GuildId,
+    #[serde(deserialize_with = "deserialize_duration_chrono")]
+    pub grace_period: Duration,
+    pub kick_message: String,
 }
