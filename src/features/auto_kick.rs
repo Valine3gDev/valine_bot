@@ -1,4 +1,7 @@
-use std::time::Duration;
+use std::{
+    sync::atomic::{AtomicBool, Ordering},
+    time::Duration,
+};
 
 use futures::StreamExt;
 use serenity::{
@@ -13,11 +16,25 @@ use crate::{
     utils::{create_message, send_message},
 };
 
-pub struct Handler;
+pub struct Handler {
+    task_started: AtomicBool,
+}
+
+impl Handler {
+    pub fn new() -> Self {
+        Self {
+            task_started: AtomicBool::new(false),
+        }
+    }
+}
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn cache_ready(&self, ctx: Context, _: Vec<GuildId>) {
+        if self.task_started.swap(true, Ordering::Relaxed) {
+            return;
+        }
+
         tokio::spawn(async move {
             let config = get_config(&ctx).await;
 
@@ -43,16 +60,16 @@ impl EventHandler for Handler {
                         continue;
                     }
 
-                    if let Err(e) = member.kick(&ctx).await {
-                        error!("Failed to kick user: {:?}", e);
-                        continue;
-                    };
-
                     let dm_message = member
                         .user
                         .id
                         .direct_message(&ctx, create_message(&config.auto_kick.kick_message))
                         .await;
+
+                    if let Err(e) = member.kick(&ctx).await {
+                        error!("Failed to kick user: {:?}", e);
+                        continue;
+                    };
 
                     let log = create_message(
                         MessageBuilder::new()
@@ -60,7 +77,7 @@ impl EventHandler for Handler {
                             .push(" (")
                             .push_mono(member.user.id.to_string())
                             .push(") をキックしました。")
-                            .push(dm_message.map(|_| "").unwrap_or_else(|_| "DMの送信に失敗しました。"))
+                            .push(dm_message.map_or("DMの送信に失敗しました。", |_| ""))
                             .build(),
                     );
                     let _ = send_message(&ctx, &config.auth.log_channel_id, log).await;
