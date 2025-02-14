@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 pub use cache::{MessageCache, MessageCacheType};
 
 use async_stream::stream;
-use futures::StreamExt;
+use futures::{future, StreamExt};
 use serenity::{
     all::{Context, EventHandler, Guild, GuildChannel, GuildId, Member},
     async_trait,
@@ -57,7 +57,8 @@ impl Handler {
             .id
             .messages_iter(&ctx)
             .take(config.message_cache.limit)
-            .filter_map(|x| async { x.ok() })
+            .take_while(|x| future::ready(x.is_ok()))
+            .filter_map(|x| future::ready(x.ok()))
             .collect::<Vec<_>>()
             .await;
 
@@ -113,7 +114,8 @@ impl EventHandler for Handler {
                     }
                 }
             }
-            .then(|c| self.cache_channel_message(ctx_ref, &config, c, &guild, &bot_member))
+            .map(|c| self.cache_channel_message(ctx_ref, &config, c, &guild, &bot_member))
+            .buffer_unordered(20)
             .collect::<Vec<_>>()
             .await;
         }

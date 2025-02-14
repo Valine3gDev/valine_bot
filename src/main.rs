@@ -24,7 +24,7 @@ use serenity::{
     prelude::*,
 };
 use sysinfo::{Pid, System};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub type PError = Box<dyn std::error::Error + Send + Sync>;
 pub struct CommandData {}
@@ -74,7 +74,7 @@ impl EventHandler for MainHandler {
     }
 
     async fn ratelimit(&self, data: RatelimitInfo) {
-        info!(
+        warn!(
             "Ratelimited {} {}: {}s",
             data.method.reqwest_method(),
             data.path,
