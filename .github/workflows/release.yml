@@ -4,9 +4,9 @@ permissions:
   contents: write
 
 on:
-  push:
-    tags:
-      - v*
+  release:
+    types:
+      - published
 
 jobs:
   build:
@@ -44,6 +44,9 @@ jobs:
         with:
           targets: ${{ matrix.target }}
           bins: cargo-zigbuild
+
+      # moldをインストール
+      - uses: rui314/setup-mold@v1
 
       # ビルド
       - name: Build with glibc version
