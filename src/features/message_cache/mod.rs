@@ -82,7 +82,8 @@ impl EventHandler for Handler {
                 }
             };
 
-            let Ok(bot_member) = guild.member(ctx_ref, config.bot.application_id).await else {
+            let bot_id = ctx_ref.cache.current_user().id;
+            let Ok(bot_member) = guild.member(ctx_ref, bot_id).await else {
                 error!("Failed to get bot member for guild: {:?}", guild_id);
                 continue;
             };

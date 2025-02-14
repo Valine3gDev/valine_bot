@@ -1,7 +1,5 @@
-
 [bot]
 token = "TOKEN"
-application_id = "000000000000000000"
 owners = [ "000000000000000000" ]
 
 
@@ -45,6 +43,13 @@ target_guild_ids = [ "000000000000000000" ]
 ignore_channel_ids = [ "000000000000000000" ]
 
 
+[pin]
+# チャンネルのオーナーを指定する
+channels = [
+    { id = "1318964564095930419", owner = "422735871410700308" }, # テスト
+]
+
+
 [thread_channel_startup]
 # 空にする方法
 # threads = []
@@ -56,9 +61,11 @@ channel_id = "000000000000000000"
 startup_message = """スレッドの始まりだぁ！
 まずはこのテンプレートを読んでね！"""
 
+
 [thread_auto_invite]
 # 自動で招待するロールのID
 role_id = "000000000000000000"
+
 
 [question]
 # 質問の投稿先フォーラムのID

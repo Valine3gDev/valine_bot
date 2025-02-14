@@ -1,9 +1,12 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use chrono::Duration;
 use duration_str::deserialize_duration_chrono;
 use regex::Regex;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use serde_with::{serde_as, DisplayFromStr};
 use serenity::{
     all::{ChannelId, Context, ForumTagId, GuildId, RoleId, UserId},
@@ -23,6 +26,7 @@ pub struct Config {
     pub auto_kick: AutoKickConfig,
     pub message_logging: MessageLoggingConfig,
     pub message_cache: MessageCacheConfig,
+    pub pin: PinConfig,
     pub thread_channel_startup: ThreadChannelStartupConfig,
     pub thread_auto_invite: ThreadAutoInviteConfig,
     pub question: QuestionConfig,
@@ -36,7 +40,6 @@ impl TypeMapKey for Config {
 pub struct BotConfig {
     pub token: String,
     pub owners: HashSet<UserId>,
-    pub application_id: UserId,
 }
 
 #[serde_as]
@@ -47,6 +50,14 @@ pub struct AuthConfig {
     #[serde_as(as = "DisplayFromStr")]
     pub trigger_regex: Regex,
     pub dummy_keywords: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AutoKickConfig {
+    pub guild_id: GuildId,
+    #[serde(deserialize_with = "deserialize_duration_chrono")]
+    pub grace_period: Duration,
+    pub kick_message: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -63,13 +74,30 @@ pub struct MessageCacheConfig {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ThreadChannelStartupConfig {
-    pub threads: Vec<ThreadStartupConfig>,
+pub struct PinConfig {
+    #[serde(deserialize_with = "to_pin_channels")]
+    pub channels: HashMap<ChannelId, UserId>,
+}
+
+fn to_pin_channels<'de, D>(deserializer: D) -> Result<HashMap<ChannelId, UserId>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Debug, Deserialize)]
+    struct Temp {
+        id: ChannelId,
+        owner: UserId,
+    }
+
+    Ok(Vec::deserialize(deserializer)?
+        .into_iter()
+        .map(|i: Temp| (i.id, i.owner))
+        .collect())
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ThreadAutoInviteConfig {
-    pub role_id: RoleId,
+pub struct ThreadChannelStartupConfig {
+    pub threads: Vec<ThreadStartupConfig>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,16 +107,13 @@ pub struct ThreadStartupConfig {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ThreadAutoInviteConfig {
+    pub role_id: RoleId,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct QuestionConfig {
     pub forum_id: ChannelId,
     pub exclude_tags: Vec<ForumTagId>,
     pub solved_tag: ForumTagId,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct AutoKickConfig {
-    pub guild_id: GuildId,
-    #[serde(deserialize_with = "deserialize_duration_chrono")]
-    pub grace_period: Duration,
-    pub kick_message: String,
 }

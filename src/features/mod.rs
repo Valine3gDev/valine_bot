@@ -3,10 +3,10 @@ mod auth;
 mod auto_kick;
 mod logging;
 mod message_cache;
+mod pin;
 mod question;
 mod thread_auto_invite;
 mod thread_channel_startup;
-mod thread_pin;
 
 pub use auth::Handler as AuthHandler;
 pub use auto_kick::Handler as AutoKickHandler;
@@ -24,7 +24,7 @@ pub fn commands() -> Vec<PCommand> {
     build_commands(vec![
         auth::create_keyword_button,
         question::question,
-        thread_pin::pin,
+        pin::pin,
         admin::reload_config,
     ])
 }
