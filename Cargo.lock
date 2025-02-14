@@ -2351,7 +2351,7 @@ checksum = "f4bf03e0ca70d626ecc4ba6b0763b934b6f2976e8c744088bb3c1d646fbb1ad0"
 
 [[package]]
 name = "valine_bot"
-version = "2.2.0"
+version = "2.3.0"
 dependencies = [
  "async-stream",
  "bpaf",
