@@ -107,8 +107,7 @@ impl EventHandler for Handler {
                     }
                 }
             }
-            .map(|channel| self.cache_channel_message(ctx_ref, &config, channel, &guild, &bot_member))
-            .buffered(10)
+            .then(|c| self.cache_channel_message(ctx_ref, &config, c, &guild, &bot_member))
             .collect::<Vec<_>>()
             .await;
         }
