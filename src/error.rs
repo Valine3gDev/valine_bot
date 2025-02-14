@@ -3,12 +3,14 @@ use serenity::all::MessageParseError;
 use thiserror::Error;
 use tracing::error;
 
-use crate::{CommandData, PError};
+use crate::{utils::format_duration, CommandData, PError};
 
 #[derive(Error, Debug)]
 pub enum BotError {
     #[error("このコマンドの実行に必要なロールがありません。")]
     HasNoRole,
+    #[error("スレッドでのみ実行できるコマンドです。")]
+    IsNotInThread,
 }
 
 pub async fn on_error(error: FrameworkError<'_, CommandData, PError>) {
@@ -54,8 +56,8 @@ pub async fn on_error(error: FrameworkError<'_, CommandData, PError>) {
             let _ = say_reply(
                 ctx,
                 format!(
-                    "このコマンドはクールダウン中です。残り時間: {}秒",
-                    remaining_cooldown.as_secs()
+                    "このコマンドはクールダウン中です。残り時間: {}",
+                    format_duration(remaining_cooldown, 2),
                 ),
             )
             .await;

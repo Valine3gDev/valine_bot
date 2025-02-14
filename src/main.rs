@@ -113,7 +113,7 @@ async fn main() {
         .options(FrameworkOptions {
             commands: commands(),
             on_error: |error| Box::pin(on_error(error)),
-            skip_checks_for_owners: true,
+            skip_checks_for_owners: false,
             owners: config.bot.owners.clone(),
             ..Default::default()
         })

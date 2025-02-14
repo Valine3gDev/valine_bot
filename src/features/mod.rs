@@ -26,6 +26,7 @@ pub fn commands() -> Vec<PCommand> {
         question::question,
         pin::pin,
         admin::reload_config,
+        thread_auto_invite::invite_thread,
     ])
 }
 

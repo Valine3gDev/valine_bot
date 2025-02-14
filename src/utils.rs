@@ -5,7 +5,7 @@ use futures::Stream;
 use itertools::Itertools;
 use serenity::{
     all::{
-        ChannelId, Context, CreateActionRow, CreateAllowedMentions, CreateInteractionResponse,
+        ChannelId, ChannelType, Context, CreateActionRow, CreateAllowedMentions, CreateInteractionResponse,
         CreateInteractionResponseMessage, CreateMessage, GuildChannel, Http, LightMethod, Message, MessageId, Request,
         Route, ThreadsData, Timestamp,
     },
@@ -89,6 +89,37 @@ pub async fn has_authed_role(ctx: PContext<'_>) -> Result<bool, PError> {
     } else {
         Ok(true)
     }
+}
+
+/*
+実行した場所がスレッドであるかどうかを確認します。
+*/
+pub async fn is_in_thread(ctx: PContext<'_>) -> Result<bool, PError> {
+    let channel = ctx.guild_channel().await.ok_or(BotError::IsNotInThread)?;
+    match channel.kind {
+        ChannelType::PublicThread | ChannelType::PrivateThread | ChannelType::NewsThread => Ok(true),
+        _ => Err(BotError::IsNotInThread.into()),
+    }
+}
+
+const UNITS: [(u64, &str); 4] = [(86400, "日"), (3600, "時間"), (60, "分"), (1, "秒")];
+
+pub fn format_duration(duration: Duration, mut count: usize) -> String {
+    let mut remaining = duration.as_secs();
+    let mut parts = Vec::new();
+
+    for (unit, label) in UNITS {
+        if remaining >= unit && count > 0 {
+            let value = remaining / unit;
+            if value > 0 {
+                parts.push(format!("{}{}", value, label));
+                remaining %= unit;
+                count -= 1;
+            }
+        }
+    }
+
+    parts.join(" ")
 }
 
 pub async fn send_message(ctx: &Context, channel_id: &ChannelId, builder: CreateMessage) -> Result<Message> {
