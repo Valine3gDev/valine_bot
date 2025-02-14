@@ -53,6 +53,7 @@ impl EventHandler for Handler {
 )]
 pub async fn invite_thread(ctx: ApplicationContext<'_, CommandData, PError>) -> Result<(), PError> {
     let config = &get_config(ctx.serenity_context()).await.thread_auto_invite;
+    ctx.defer_ephemeral().await?;
     invite_thread_by_role(ctx.serenity_context(), ctx.channel_id(), config.role_id).await;
     say_reply(ctx.into(), "スレッドに招待しました。").await?;
     Ok(())
