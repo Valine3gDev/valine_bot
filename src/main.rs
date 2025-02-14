@@ -3,7 +3,14 @@ mod error;
 mod features;
 mod utils;
 
-use std::{fs::read_to_string, sync::Arc};
+use std::{
+    fs::read_to_string,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use bpaf::Bpaf;
 use config::Config;
@@ -11,11 +18,12 @@ use error::on_error;
 use features::{commands, MessageCache, MessageCacheType};
 use poise::{Framework, FrameworkOptions};
 use serenity::{
-    all::{RatelimitInfo, Ready},
+    all::{ActivityData, GuildId, RatelimitInfo, Ready},
     async_trait,
     cache::Settings as CacheSettings,
     prelude::*,
 };
+use sysinfo::{Pid, System};
 use tracing::{error, info};
 
 pub type PError = Box<dyn std::error::Error + Send + Sync>;
@@ -23,7 +31,17 @@ pub struct CommandData {}
 pub type PContext<'a> = poise::Context<'a, CommandData, PError>;
 pub type PCommand = poise::Command<CommandData, PError>;
 
-struct MainHandler;
+struct MainHandler {
+    task_started: AtomicBool,
+}
+
+impl MainHandler {
+    pub fn new() -> Self {
+        Self {
+            task_started: AtomicBool::new(false),
+        }
+    }
+}
 
 #[async_trait]
 impl EventHandler for MainHandler {
@@ -31,8 +49,37 @@ impl EventHandler for MainHandler {
         info!("{} is connected!", ready.user.name);
     }
 
+    async fn cache_ready(&self, ctx: Context, _: Vec<GuildId>) {
+        if self.task_started.swap(true, Ordering::Relaxed) {
+            return;
+        }
+
+        tokio::spawn(async move {
+            let mut system = System::new_all();
+            let pid = Pid::from_u32(std::process::id());
+
+            loop {
+                system.refresh_all();
+
+                let Some(memory) = system.process(pid).map(|p| p.memory() as f64 / 1024.0 / 1024.0) else {
+                    error!("Failed to get process info");
+                    continue;
+                };
+
+                ctx.set_activity(Some(ActivityData::custom(format!("メモリ使用量: {:.1}MB", memory))));
+
+                tokio::time::sleep(Duration::from_secs(60)).await;
+            }
+        });
+    }
+
     async fn ratelimit(&self, data: RatelimitInfo) {
-        info!("Ratelimited {}: {}s", data.path, data.timeout.as_secs());
+        info!(
+            "Ratelimited {} {}: {}s",
+            data.method.reqwest_method(),
+            data.path,
+            data.timeout.as_secs()
+        );
     }
 }
 
@@ -83,9 +130,9 @@ async fn main() {
     settings.max_messages = 1_000_000;
     let mut client = Client::builder(&config.bot.token, intents)
         .framework(framework)
-        .event_handler(MainHandler)
+        .event_handler(MainHandler::new())
         .event_handler(features::AuthHandler::new())
-        .event_handler(features::AutoKickHandler)
+        .event_handler(features::AutoKickHandler::new())
         .event_handler(features::LoggingHandler)
         .event_handler(features::ThreadAutoInviteHandler)
         .event_handler(features::ThreadChannelStartupHandler)

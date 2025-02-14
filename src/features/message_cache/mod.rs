@@ -1,5 +1,7 @@
 mod cache;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 pub use cache::{MessageCache, MessageCacheType};
 
 use async_stream::stream;
@@ -17,11 +19,15 @@ use crate::{
 
 pub struct Handler {
     disabled: bool,
+    collected: AtomicBool,
 }
 
 impl Handler {
     pub fn new(disabled: bool) -> Self {
-        Self { disabled }
+        Self {
+            disabled,
+            collected: AtomicBool::new(false),
+        }
     }
 
     async fn cache_channel_message(
@@ -66,7 +72,7 @@ impl Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn cache_ready(&self, ctx: Context, _: Vec<GuildId>) {
-        if self.disabled {
+        if self.disabled || self.collected.swap(true, Ordering::Relaxed) {
             return;
         }
 

@@ -10,8 +10,6 @@ reorder_keys = false
 include = [ "**/Cargo.toml" ]
 keys = [ "dependencies" ]
 
-[[rule]]
-include = [ "taplo.toml" ]
 
 [rule.formatting]
 reorder_keys = true
