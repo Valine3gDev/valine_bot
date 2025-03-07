@@ -32,7 +32,7 @@ impl Handler {
 
     fn remaining_cooldown(&self, user_id: UserId) -> Option<u64> {
         if let Some(instant) = self.cooldown.get(&user_id) {
-            let remaining = (AUTH_COOLDOWN - instant.elapsed()).as_secs();
+            let remaining = AUTH_COOLDOWN.checked_sub(instant.elapsed())?.as_secs();
             if remaining > 0 {
                 return Some(remaining);
             }
