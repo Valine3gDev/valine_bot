@@ -11,6 +11,8 @@ pub enum BotError {
     HasNoRole,
     #[error("スレッドでのみ実行できるコマンドです。")]
     IsNotInThread,
+    #[error("プライベートスレッドでは実行できません。")]
+    IsPrivateThread,
 }
 
 pub async fn on_error(error: FrameworkError<'_, CommandData, PError>) {

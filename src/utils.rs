@@ -92,12 +92,13 @@ pub async fn has_authed_role(ctx: PContext<'_>) -> Result<bool, PError> {
 }
 
 /*
-実行した場所がスレッドであるかどうかを確認します。
+実行した場所がパブリックスレッドであるかどうかを確認します。
 */
-pub async fn is_in_thread(ctx: PContext<'_>) -> Result<bool, PError> {
+pub async fn is_in_public_thread(ctx: PContext<'_>) -> Result<bool, PError> {
     let channel = ctx.guild_channel().await.ok_or(BotError::IsNotInThread)?;
     match channel.kind {
-        ChannelType::PublicThread | ChannelType::PrivateThread | ChannelType::NewsThread => Ok(true),
+        ChannelType::PublicThread | ChannelType::NewsThread => Ok(true),
+        ChannelType::PrivateThread => Err(BotError::IsPrivateThread.into()),
         _ => Err(BotError::IsNotInThread.into()),
     }
 }

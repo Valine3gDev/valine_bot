@@ -1,14 +1,14 @@
-use poise::{say_reply, ApplicationContext};
+use poise::{ApplicationContext, say_reply};
 use serenity::{
-    all::{ChannelId, Context, EditMessage, EventHandler, GuildChannel, Mentionable, RoleId},
+    all::{ChannelId, ChannelType, Context, EditMessage, EventHandler, GuildChannel, Mentionable, RoleId},
     async_trait,
 };
 use tracing::error;
 
 use crate::{
-    config::get_config,
-    utils::{await_initial_message, create_message, has_authed_role, is_in_thread},
     CommandData, PError,
+    config::get_config,
+    utils::{await_initial_message, create_message, has_authed_role, is_in_public_thread},
 };
 
 async fn invite_thread_by_role(ctx: &Context, thread_id: ChannelId, role_id: RoleId) {
@@ -32,6 +32,10 @@ pub struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn thread_create(&self, ctx: Context, thread: GuildChannel) {
+        if thread.kind == ChannelType::PrivateThread {
+            return;
+        }
+
         if await_initial_message(&ctx, &thread).await {
             return;
         }
@@ -49,7 +53,7 @@ impl EventHandler for Handler {
     aliases("スレッドに招待"),
     channel_cooldown = 86400, // 24 時間
     check = "has_authed_role",
-    check = "is_in_thread"
+    check = "is_in_public_thread"
 )]
 pub async fn invite_thread(ctx: ApplicationContext<'_, CommandData, PError>) -> Result<(), PError> {
     let config = &get_config(ctx.serenity_context()).await.thread_auto_invite;
