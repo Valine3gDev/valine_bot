@@ -1,9 +1,9 @@
-use poise::{say_reply, FrameworkError};
+use poise::{FrameworkError, say_reply};
 use serenity::all::MessageParseError;
 use thiserror::Error;
 use tracing::error;
 
-use crate::{utils::format_duration, CommandData, PError};
+use crate::{CommandData, PError, utils::format_duration};
 
 #[derive(Error, Debug)]
 pub enum BotError {

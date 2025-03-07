@@ -1,6 +1,6 @@
 use std::ops::Not;
 
-use itertools::{enumerate, Itertools};
+use itertools::{Itertools, enumerate};
 use serenity::{
     all::{
         ChannelId, Context, CreateEmbed, EmbedMessageBuilding, EventHandler, FormattedTimestamp,

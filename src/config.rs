@@ -7,7 +7,7 @@ use chrono::Duration;
 use duration_str::deserialize_duration_chrono;
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use serenity::{
     all::{ChannelId, Context, ForumTagId, GuildId, RoleId, UserId},
     prelude::TypeMapKey,

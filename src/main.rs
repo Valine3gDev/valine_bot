@@ -6,8 +6,8 @@ mod utils;
 use std::{
     fs::read_to_string,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     time::Duration,
 };
@@ -15,7 +15,7 @@ use std::{
 use bpaf::Bpaf;
 use config::Config;
 use error::on_error;
-use features::{commands, MessageCache, MessageCacheType};
+use features::{MessageCache, MessageCacheType, commands};
 use poise::{Framework, FrameworkOptions};
 use serenity::{
     all::{ActivityData, GuildId, RatelimitInfo, Ready},

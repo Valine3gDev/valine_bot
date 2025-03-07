@@ -3,7 +3,7 @@ use std::sync::Arc;
 use poise::say_reply;
 use tokio::fs::read_to_string;
 
-use crate::{config::Config, PContext, PError};
+use crate::{PContext, PError, config::Config};
 
 /// コンフィグを再読み込み
 #[poise::command(slash_command, ephemeral, owners_only, dm_only)]

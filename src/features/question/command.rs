@@ -3,16 +3,16 @@ use serenity::all::{
     ButtonStyle, Channel, CreateActionRow, CreateButton, CreateForumPost, CreateMessage, CreateSelectMenu,
     CreateSelectMenuKind, CreateSelectMenuOption, ForumEmoji, ForumTag, ForumTagId, MessageBuilder, ReactionType,
 };
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use tracing::debug;
 
 use std::sync::Arc;
 use std::vec;
 
 use crate::config::get_config;
+use crate::features::question::QUESTION_CLOSE_PREFIX;
 use crate::features::question::modal::{BasicQuestionData, DetailedQuestionData};
 use crate::features::question::question_creation_handler::{CustomIds, QuestionCreationHandler};
-use crate::features::question::QUESTION_CLOSE_PREFIX;
 use crate::utils::has_authed_role;
 use crate::{CommandData, PError};
 
@@ -178,12 +178,11 @@ pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Resul
                 &basic_data.title,
                 CreateMessage::default()
                     .content(msg)
-                    .components(vec![CreateActionRow::Buttons(vec![CreateButton::new(format!(
-                        "{}:{}",
-                        QUESTION_CLOSE_PREFIX, ctx.interaction.user.id
-                    ))
-                    .label("質問を解決済みにする")
-                    .style(ButtonStyle::Danger)])]),
+                    .components(vec![CreateActionRow::Buttons(vec![
+                        CreateButton::new(format!("{}:{}", QUESTION_CLOSE_PREFIX, ctx.interaction.user.id))
+                            .label("質問を解決済みにする")
+                            .style(ButtonStyle::Danger),
+                    ])]),
             )
             .set_applied_tags(&*forum_tag_ids),
         )

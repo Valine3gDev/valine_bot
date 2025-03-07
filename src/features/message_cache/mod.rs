@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 pub use cache::{MessageCache, MessageCacheType};
 
 use async_stream::stream;
-use futures::{future, StreamExt};
+use futures::{StreamExt, future};
 use serenity::{
     all::{Context, EventHandler, Guild, GuildChannel, GuildId, Member},
     async_trait,
@@ -13,7 +13,7 @@ use serenity::{
 use tracing::{error, info};
 
 use crate::{
-    config::{get_config, Config},
+    config::{Config, get_config},
     utils::fetch_all_archived_public_thread,
 };
 

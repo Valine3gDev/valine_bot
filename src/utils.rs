@@ -4,17 +4,17 @@ use async_stream::stream;
 use futures::Stream;
 use itertools::Itertools;
 use serenity::{
+    Result,
     all::{
         ChannelId, ChannelType, Context, CreateActionRow, CreateAllowedMentions, CreateInteractionResponse,
         CreateInteractionResponseMessage, CreateMessage, GuildChannel, Http, LightMethod, Message, MessageId, Request,
         Route, ThreadsData, Timestamp,
     },
-    Result,
 };
 use similar::{Algorithm, ChangeTag, TextDiff};
 use tracing::error;
 
-use crate::{config::get_config, error::BotError, MessageCacheType, PContext, PError};
+use crate::{MessageCacheType, PContext, PError, config::get_config, error::BotError};
 
 pub fn create_safe_message() -> CreateMessage {
     CreateMessage::new().allowed_mentions(CreateAllowedMentions::new().all_users(false))

@@ -6,7 +6,7 @@ use serenity::all::{GuildChannel, Message, MessageType};
 
 use crate::config::Config;
 use crate::utils::has_authed_role;
-use crate::{config::get_config, PContext, PError};
+use crate::{PContext, PError, config::get_config};
 
 async fn check_owner(ctx: PContext<'_>, config: &Config, channel: &GuildChannel) -> bool {
     let author_id = ctx.author().id;

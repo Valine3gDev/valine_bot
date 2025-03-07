@@ -8,7 +8,7 @@ use serenity::{
     },
     futures::StreamExt,
 };
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use tracing::error;
 
 use super::modal::{BasicQuestionData, DetailedQuestionData};
