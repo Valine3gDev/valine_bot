@@ -15,7 +15,9 @@ use std::{
 use bpaf::Bpaf;
 use config::Config;
 use error::on_error;
-use features::{MessageCache, MessageCacheType, commands};
+use features::{
+    MemberCache, MemberCacheType, MessageCache, MessageCacheType, RoleCountCache, RoleCountCacheType, commands,
+};
 use poise::{Framework, FrameworkOptions};
 use serenity::{
     all::{ActivityData, GuildId, RatelimitInfo, Ready},
@@ -125,21 +127,29 @@ async fn main() {
         })
         .build();
 
-    let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::GUILDS | GatewayIntents::MESSAGE_CONTENT;
+    let intents = GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::GUILDS
+        | GatewayIntents::GUILD_MEMBERS
+        | GatewayIntents::MESSAGE_CONTENT;
+
     let mut settings = CacheSettings::default();
     settings.max_messages = 1_000_000;
+
     let mut client = Client::builder(&config.bot.token, intents)
         .framework(framework)
         .event_handler(MainHandler::new())
         .event_handler(features::AuthHandler::new())
         .event_handler(features::AutoKickHandler::new())
         .event_handler(features::LoggingHandler)
-        .event_handler(features::ThreadAutoInviteHandler)
+        .event_handler(features::MemberCacheHandler::new())
+        .event_handler(features::ThreadAutoInviteHandler::new())
         .event_handler(features::ThreadChannelStartupHandler)
         .event_handler(features::QuestionHandler)
         .event_handler(features::MessageCacheHandler::new(config.message_cache.disabled))
         .cache_settings(settings)
         .type_map_insert::<MessageCacheType>(Arc::new(MessageCache::new()))
+        .type_map_insert::<MemberCacheType>(Arc::new(MemberCache::new()))
+        .type_map_insert::<RoleCountCacheType>(Arc::new(RoleCountCache::new()))
         .type_map_insert::<Config>(Arc::new(config))
         .await
         .expect("Err creating client");

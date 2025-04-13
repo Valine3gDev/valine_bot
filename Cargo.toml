@@ -1,6 +1,6 @@
 [package]
 name = "valine_bot"
-version = "2.3.3"
+version = "2.4.0"
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -10,10 +10,10 @@ async-stream = "0.3"
 bpaf = { version = "0.9", features = [ "derive" ] }
 chrono = "0.4"
 dashmap = "6.1"
-duration-str = "0.13.0"
+duration-str = "0.17.0"
 futures = "0.3"
 itertools = "0.14"
-sysinfo = "0.33"
+sysinfo = "0.34"
 # Git 上では修正されているが、crates.io にはまだ反映されていないため、git で指定
 poise = { git = "https://github.com/serenity-rs/poise", rev = "db10b126c8b07f7e1924cba1672f04ff24ed4ec7" }
 rand = "0.9"
