@@ -59,6 +59,7 @@ impl EventHandler for Handler {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct MemberCache {
     cache: DashMap<GuildId, HashMap<UserId, Member>>,
 }

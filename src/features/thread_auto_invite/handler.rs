@@ -98,6 +98,20 @@ impl EventHandler for Handler {
     }
 
     async fn guild_member_removal(&self, ctx: Context, guild_id: GuildId, user: User, _: Option<Member>) {
+        let Some(old) = MemberCache::get_member(&ctx, guild_id, user.id).await else {
+            error!("Member update event with no old member");
+            return;
+        };
+
+        let config = &get_config(&ctx).await.thread_auto_invite;
+
+        let mut data = ctx.data.write().await;
+        let cache = data.get_mut::<RoleCountCacheType>().unwrap();
+        old.roles
+            .iter()
+            .filter(|r| config.role_ids.contains(r))
+            .for_each(|r| cache.decrement(*r));
+
         MemberCache::remove_member(&ctx, guild_id, user.id).await;
     }
 
