@@ -65,7 +65,7 @@ jobs:
         shell: bash
         run: |
           mv target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }} ./target/release/
-          cp ./target/release/${{ env.PROJECT_NAME }} {,-${{ github.ref_name }}-${{ matrix.target }}${{ matrix.extension }}}
+          cp ./target/release/${{ env.PROJECT_NAME }}{,-${{ github.ref_name }}-${{ matrix.target }}${{ matrix.extension }}}
 
       # ビルド済みバイナリをReleasesに配置
       - name: Release
