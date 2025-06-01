@@ -15,4 +15,4 @@ RUN case "$TARGETPLATFORM" in \
 FROM gcr.io/distroless/cc-debian12:nonroot
 WORKDIR /app
 COPY --from=builder /builder/valine_bot /app/valine_bot
-CMD ["./valine_bot"]
+ENTRYPOINT ["./valine_bot"]
