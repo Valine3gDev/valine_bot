@@ -97,12 +97,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let config = read_to_string("config.toml").expect("Failed to read config.toml");
-    let config = match toml::from_str::<Config>(&config) {
-        Ok(config) => config,
-        Err(e) => {
-            panic!("Failed to parse config.toml: {}", e);
-        }
-    };
+    let config = toml::from_str::<Config>(&config).unwrap_or_else(|e| panic!("Failed to parse config.toml: {}", e));
 
     let options = options().run();
 
