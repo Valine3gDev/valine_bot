@@ -12,7 +12,7 @@ RUN case "$TARGETPLATFORM" in \
     esac && \
     chmod +x ./valine_bot
 
-FROM debian:bookworm-slim
+FROM gcr.io/distroless/cc-debian12:nonroot
 WORKDIR /app
 COPY --from=builder /builder/valine_bot /app/valine_bot
 CMD ["./valine_bot"]
