@@ -18,11 +18,11 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             glibc: 2.17
-            extension: ""
+            docker_platform: linux/amd64
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             glibc: 2.17
-            extension: ""
+            docker_platform: linux/arm64
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -65,7 +65,7 @@ jobs:
         shell: bash
         run: |
           mv target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }} ./target/release/
-          cp ./target/release/${{ env.PROJECT_NAME }}{,-${{ github.ref_name }}-${{ matrix.target }}${{ matrix.extension }}}
+          cp target/release/${{ env.PROJECT_NAME }}{,-${{ github.ref_name }}-${{ matrix.target }}}
 
       # ビルド済みバイナリをReleasesに配置
       - name: Release
@@ -74,7 +74,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: |
-            target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-${{ github.ref_name }}-${{ matrix.target }}${{ matrix.extension }}
+            target/release/${{ env.PROJECT_NAME }}-${{ github.ref_name }}-${{ matrix.target }}
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -100,3 +100,4 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          platforms: ${{ matrix.docker_platform }}
