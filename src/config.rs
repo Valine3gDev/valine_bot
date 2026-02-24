@@ -30,6 +30,8 @@ pub struct Config {
     pub thread_channel_startup: ThreadChannelStartupConfig,
     pub thread_auto_invite: ThreadAutoInviteConfig,
     pub question: QuestionConfig,
+    #[serde(default)]
+    pub mod_info: ModInfoConfig,
 }
 
 impl TypeMapKey for Config {
@@ -118,4 +120,29 @@ pub struct QuestionConfig {
     pub forum_id: ChannelId,
     pub exclude_tags: Vec<ForumTagId>,
     pub solved_tag: ForumTagId,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ModInfoConfig {
+    pub curseforge_api_key: Option<String>,
+    #[serde(default = "ModInfoConfig::default_mode")]
+    pub mode: String,
+    #[serde(default)]
+    pub allowed_channel_ids: Vec<ChannelId>,
+}
+
+impl ModInfoConfig {
+    fn default_mode() -> String {
+        "all".to_string()
+    }
+}
+
+impl Default for ModInfoConfig {
+    fn default() -> Self {
+        Self {
+            curseforge_api_key: None,
+            mode: Self::default_mode(),
+            allowed_channel_ids: vec![],
+        }
+    }
 }

@@ -18,6 +18,7 @@ sysinfo = "0.35"
 poise = { git = "https://github.com/serenity-rs/poise", rev = "db10b126c8b07f7e1924cba1672f04ff24ed4ec7" }
 rand = "0.9"
 regex = "1.0"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_with = "3"
 serenity = "0.12.4"

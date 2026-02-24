@@ -140,6 +140,7 @@ async fn main() {
         .event_handler(features::ThreadAutoInviteHandler::new())
         .event_handler(features::ThreadChannelStartupHandler)
         .event_handler(features::QuestionHandler)
+        .event_handler(features::ModInfoHandler::new())
         .event_handler(features::MessageCacheHandler::new(config.message_cache.disabled))
         .cache_settings(settings)
         .type_map_insert::<MessageCacheType>(Arc::new(MessageCache::new()))
