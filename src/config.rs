@@ -129,11 +129,17 @@ pub struct ModInfoConfig {
     pub mode: String,
     #[serde(default)]
     pub allowed_channel_ids: Vec<ChannelId>,
+    #[serde(default = "ModInfoConfig::default_max_embeds")]
+    pub max_embeds_per_message: usize,
 }
 
 impl ModInfoConfig {
     fn default_mode() -> String {
         "all".to_string()
+    }
+
+    fn default_max_embeds() -> usize {
+        10
     }
 }
 
@@ -143,6 +149,7 @@ impl Default for ModInfoConfig {
             curseforge_api_key: None,
             mode: Self::default_mode(),
             allowed_channel_ids: vec![],
+            max_embeds_per_message: Self::default_max_embeds(),
         }
     }
 }
