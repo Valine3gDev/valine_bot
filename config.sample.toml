@@ -78,3 +78,14 @@ forum_id = "000000000000000000"
 solved_tag = "000000000000000000"
 # 除外するタグIDのリスト
 exclude_tags = [ "000000000000000000" ]
+
+
+[mod_info]
+# CurseForge の API キー
+curseforge_api_key = "API_KEY"
+
+# 反応するチャンネルの設定: "all"（全チャンネル）または "channels"（指定チャンネルのみ）
+mode = "all"
+
+# mode = "channels" のとき有効なチャンネル ID のリスト
+# allowed_channel_ids = [ "000000000000000000" ]
