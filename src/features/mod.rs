@@ -13,12 +13,11 @@ pub use auto_kick::Handler as AutoKickHandler;
 pub use logging::Handler as LoggingHandler;
 pub use message_cache::Handler as MessageCacheHandler;
 pub use question::Handler as QuestionHandler;
-pub use thread_auto_invite::MemberCacheHandler;
 pub use thread_auto_invite::ThreadAutoInviteHandler;
 pub use thread_channel_startup::Handler as ThreadChannelStartupHandler;
 
 pub use message_cache::{MessageCache, MessageCacheType};
-pub use thread_auto_invite::{MemberCache, MemberCacheType, RoleCountCache, RoleCountCacheType};
+pub use thread_auto_invite::{RoleCountCache, RoleCountCacheType};
 
 use crate::PCommand;
 

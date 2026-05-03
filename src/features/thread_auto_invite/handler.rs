@@ -13,7 +13,7 @@ use crate::{
     utils::{await_initial_message, create_message},
 };
 
-use super::{RoleCountCache, RoleCountCacheType, member_cache::MemberCache, role_count_cache::find_role};
+use super::{RoleCountCache, RoleCountCacheType, role_count_cache::find_role};
 
 pub struct Handler;
 
@@ -93,12 +93,8 @@ impl EventHandler for Handler {
         invite_thread_by_roles(&ctx, thread.id, &config.role_ids).await;
     }
 
-    async fn guild_member_addition(&self, ctx: Context, member: Member) {
-        MemberCache::insert_member(&ctx, &member).await;
-    }
-
-    async fn guild_member_removal(&self, ctx: Context, guild_id: GuildId, user: User, _: Option<Member>) {
-        let Some(old) = MemberCache::get_member(&ctx, guild_id, user.id).await else {
+    async fn guild_member_removal(&self, ctx: Context, _: GuildId, _: User, old: Option<Member>) {
+        let Some(old) = old else {
             error!("Member update event with no old member");
             return;
         };
@@ -111,28 +107,23 @@ impl EventHandler for Handler {
             .iter()
             .filter(|r| config.role_ids.contains(r))
             .for_each(|r| cache.decrement(*r));
-
-        MemberCache::remove_member(&ctx, guild_id, user.id).await;
     }
 
     async fn guild_member_update(
         &self,
         ctx: Context,
-        _: Option<Member>,
+        old: Option<Member>,
         new: Option<Member>,
-        event: GuildMemberUpdateEvent,
+        _: GuildMemberUpdateEvent,
     ) {
         let Some(new) = new else {
             error!("Member update event with no new member");
             return;
         };
-
-        let Some(old) = MemberCache::get_member(&ctx, event.guild_id, new.user.id).await else {
+        let Some(old) = old else {
             error!("Member update event with no old member");
             return;
         };
-
-        MemberCache::insert_member(&ctx, &new).await;
 
         let config = &get_config(&ctx).await.thread_auto_invite;
 

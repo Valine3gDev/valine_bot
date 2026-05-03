@@ -7,9 +7,7 @@ use serenity::{
 };
 use tracing::info;
 
-use crate::config::ThreadAutoInviteConfig;
-
-use super::MemberCache;
+use crate::{config::ThreadAutoInviteConfig, utils::get_guild_members};
 
 #[derive(Debug, Clone)]
 pub struct RoleCountCache {
@@ -66,10 +64,10 @@ impl TypeMapKey for RoleCountCacheType {
 
 pub async fn find_role(ctx: &Context, guild_id: GuildId, config: &ThreadAutoInviteConfig) -> Option<RoleId> {
     if RoleCountCache::is_empty(ctx).await {
-        let members = MemberCache::get_all_members(ctx, guild_id).await;
+        let members = get_guild_members(ctx, guild_id);
         let mut data = ctx.data.write().await;
         let cache = data.get_mut::<RoleCountCacheType>().unwrap();
-        cache.init(&members);
+        cache.init(members.collect::<Vec<_>>().as_slice());
     }
 
     let data = ctx.data.read().await;

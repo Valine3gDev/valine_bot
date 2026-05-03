@@ -7,8 +7,8 @@ use serenity::{
     Result,
     all::{
         ChannelId, ChannelType, Context, CreateActionRow, CreateAllowedMentions, CreateInteractionResponse,
-        CreateInteractionResponseMessage, CreateMessage, GuildChannel, Http, LightMethod, Message, MessageId, Request,
-        Route, ThreadsData, Timestamp,
+        CreateInteractionResponseMessage, CreateMessage, GuildChannel, GuildId, Http, LightMethod, Member, Message,
+        MessageId, Request, Route, ThreadsData, Timestamp,
     },
 };
 use similar::{Algorithm, ChangeTag, TextDiff};
@@ -220,4 +220,12 @@ pub fn create_diff_lines_text(old: &str, new: &str) -> String {
             ChangeTag::Equal => format!("  {}", c),
         })
         .join("")
+}
+
+pub fn get_guild_members(ctx: &Context, guild_id: GuildId) -> impl Iterator<Item = Member> {
+    guild_id
+        .to_guild_cached(ctx)
+        .map(|guild| guild.members.clone().into_values())
+        .into_iter()
+        .flatten()
 }

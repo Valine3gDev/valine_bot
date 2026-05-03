@@ -15,12 +15,10 @@ use std::{
 use bpaf::Bpaf;
 use config::Config;
 use error::on_error;
-use features::{
-    MemberCache, MemberCacheType, MessageCache, MessageCacheType, RoleCountCache, RoleCountCacheType, commands,
-};
+use features::{MessageCache, MessageCacheType, RoleCountCache, RoleCountCacheType, commands};
 use poise::{Framework, FrameworkOptions};
 use serenity::{
-    all::{ActivityData, GuildId, RatelimitInfo, Ready},
+    all::{ActivityData, ChunkGuildFilter, Guild, GuildId, RatelimitInfo, Ready},
     async_trait,
     cache::Settings as CacheSettings,
     prelude::*,
@@ -73,6 +71,12 @@ impl EventHandler for MainHandler {
                 tokio::time::sleep(Duration::from_secs(60)).await;
             }
         });
+    }
+
+    async fn guild_create(&self, ctx: Context, guild: Guild, _: Option<bool>) {
+        // 全てのメンバーを取得する。結果は Serenity によって自動でキャッシュされる。
+        ctx.shard
+            .chunk_guild(guild.id, Some(0), false, ChunkGuildFilter::None, None);
     }
 
     async fn ratelimit(&self, data: RatelimitInfo) {
@@ -136,14 +140,12 @@ async fn main() {
         .event_handler(features::AuthHandler::new())
         .event_handler(features::AutoKickHandler::new())
         .event_handler(features::LoggingHandler)
-        .event_handler(features::MemberCacheHandler::new())
         .event_handler(features::ThreadAutoInviteHandler::new())
         .event_handler(features::ThreadChannelStartupHandler)
         .event_handler(features::QuestionHandler)
         .event_handler(features::MessageCacheHandler::new(config.message_cache.disabled))
         .cache_settings(settings)
         .type_map_insert::<MessageCacheType>(Arc::new(MessageCache::new()))
-        .type_map_insert::<MemberCacheType>(Arc::new(MemberCache::new()))
         .type_map_insert::<RoleCountCacheType>(Arc::new(RoleCountCache::new()))
         .type_map_insert::<Config>(Arc::new(config))
         .await

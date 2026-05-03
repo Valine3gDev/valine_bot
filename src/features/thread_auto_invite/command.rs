@@ -4,10 +4,10 @@ use crate::{
     CommandData, PError,
     config::get_config,
     features::thread_auto_invite::handler::invite_thread_by_roles,
-    utils::{has_authed_role, is_in_public_thread},
+    utils::{get_guild_members, has_authed_role, is_in_public_thread},
 };
 
-use super::{handler::Handler, member_cache::MemberCache};
+use super::handler::Handler;
 
 /// 招待用ロールを持ったメンバーを実行したスレッドに招待します。
 #[poise::command(
@@ -30,7 +30,7 @@ pub async fn invite_thread(ctx: ApplicationContext<'_, CommandData, PError>) -> 
 /// 表示用のロールを持ったメンバーに呼び出し用のロールを付与します
 #[poise::command(slash_command, guild_only, default_member_permissions = "MANAGE_ROLES")]
 pub async fn add_invite_role(ctx: ApplicationContext<'_, CommandData, PError>) -> Result<(), PError> {
-    let members = MemberCache::get_all_members(ctx.serenity_context(), ctx.guild_id().unwrap()).await;
+    let members = get_guild_members(ctx.serenity_context(), ctx.guild_id().unwrap());
 
     let config = &get_config(ctx.serenity_context()).await.thread_auto_invite;
 
@@ -57,7 +57,7 @@ pub async fn add_invite_role(ctx: ApplicationContext<'_, CommandData, PError>) -
 /// 表示用のロールを持ったメンバーに呼び出し用のロールを削除
 #[poise::command(slash_command, guild_only, default_member_permissions = "MANAGE_ROLES")]
 pub async fn remove_invite_role(ctx: ApplicationContext<'_, CommandData, PError>) -> Result<(), PError> {
-    let members = MemberCache::get_all_members(ctx.serenity_context(), ctx.guild_id().unwrap()).await;
+    let members = get_guild_members(ctx.serenity_context(), ctx.guild_id().unwrap());
 
     let config = &get_config(ctx.serenity_context()).await.thread_auto_invite;
 
