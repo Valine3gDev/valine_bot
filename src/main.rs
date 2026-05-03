@@ -15,7 +15,7 @@ use std::{
 use bpaf::Bpaf;
 use config::Config;
 use error::on_error;
-use features::{MessageCache, MessageCacheType, RoleCountCache, RoleCountCacheType, commands};
+use features::{MessageCache, MessageCacheType, commands};
 use poise::{Framework, FrameworkOptions};
 use serenity::{
     all::{ActivityData, ChunkGuildFilter, Guild, GuildId, RatelimitInfo, Ready},
@@ -146,7 +146,6 @@ async fn main() {
         .event_handler(features::MessageCacheHandler::new(config.message_cache.disabled))
         .cache_settings(settings)
         .type_map_insert::<MessageCacheType>(Arc::new(MessageCache::new()))
-        .type_map_insert::<RoleCountCacheType>(Arc::new(RoleCountCache::new()))
         .type_map_insert::<Config>(Arc::new(config))
         .await
         .expect("Err creating client");

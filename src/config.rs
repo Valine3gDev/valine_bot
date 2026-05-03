@@ -110,7 +110,7 @@ pub struct ThreadStartupConfig {
 pub struct ThreadAutoInviteConfig {
     pub display_role_id: RoleId,
     pub role_ids: Vec<RoleId>,
-    pub min_member_count: usize,
+    pub min_member_count: u32,
 }
 
 #[derive(Debug, Deserialize)]

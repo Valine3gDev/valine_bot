@@ -2,7 +2,7 @@ use itertools::Itertools;
 use serenity::{
     all::{
         ChannelId, ChannelType, Context, EditMessage, EventHandler, GuildChannel, GuildId, GuildMemberUpdateEvent,
-        Member, Mentionable, RoleId, User,
+        Member, Mentionable, RoleId,
     },
     async_trait,
 };
@@ -13,8 +13,6 @@ use crate::{
     utils::{await_initial_message, create_message},
 };
 
-use super::{RoleCountCache, RoleCountCacheType, role_count_cache::find_role};
-
 pub struct Handler;
 
 impl Handler {
@@ -22,41 +20,45 @@ impl Handler {
         Self
     }
 
-    pub(super) async fn role_added(ctx: &Context, new: &Member, config: &ThreadAutoInviteConfig) {
-        let Some(role) = find_role(ctx, new.guild_id, config).await else {
+    async fn find_role(ctx: &Context, guild_id: GuildId, config: &ThreadAutoInviteConfig) -> Option<RoleId> {
+        let role_member_counts = ctx
+            .http
+            .get_guild_role_member_counts(guild_id)
+            .await
+            .map_err(|e| error!("Failed to get guild role member counts: {}", e))
+            .ok()?;
+
+        config.role_ids.iter().find_map(|&role_id| {
+            let count = *role_member_counts.get(&role_id)?;
+            (count < config.min_member_count).then_some(role_id)
+        })
+    }
+
+    pub(super) async fn handle_role_assignment(ctx: &Context, new: &Member, config: &ThreadAutoInviteConfig) {
+        let Some(role) = Self::find_role(ctx, new.guild_id, config).await else {
             error!("No role found with count less than {}", config.min_member_count);
             return;
         };
 
-        let result = new
-            .add_role(ctx, role)
-            .await
-            .map_err(|_| error!("Failed to add role {} to member {}", role, new.user.id))
-            .is_ok();
-
-        if result {
-            RoleCountCache::increment_count(ctx, role).await;
+        if let Err(e) = new.add_role(ctx, role).await {
+            error!("Failed to add role {} to member {}: {}", role, new.user.id, e);
+        } else {
+            info!("Added role {} to member {}", role, new.user.id);
         }
     }
 
-    pub(super) async fn role_removed(ctx: &Context, old: &Member, config: &ThreadAutoInviteConfig) {
+    pub(super) async fn handle_role_removal(ctx: &Context, old: &Member, config: &ThreadAutoInviteConfig) {
         let roles = old
             .roles
             .iter()
             .filter(|r| config.role_ids.contains(r))
             .collect::<Vec<_>>();
 
-        let mut data = ctx.data.write().await;
-        let cache = data.get_mut::<RoleCountCacheType>().unwrap();
-
         for role_id in roles {
-            let result = old
-                .remove_role(&ctx, role_id)
-                .await
-                .map_err(|_| error!("Failed to remove role {} from member {}", role_id, old.user.id))
-                .is_ok();
-            if result {
-                cache.decrement(*role_id);
+            if let Err(e) = old.remove_role(&ctx, role_id).await {
+                error!("Failed to remove role {} from member {}: {}", role_id, old.user.id, e);
+            } else {
+                info!("Removed role {} from member {}", role_id, old.user.id);
                 break;
             }
         }
@@ -93,22 +95,6 @@ impl EventHandler for Handler {
         invite_thread_by_roles(&ctx, thread.id, &config.role_ids).await;
     }
 
-    async fn guild_member_removal(&self, ctx: Context, _: GuildId, _: User, old: Option<Member>) {
-        let Some(old) = old else {
-            error!("Member update event with no old member");
-            return;
-        };
-
-        let config = &get_config(&ctx).await.thread_auto_invite;
-
-        let mut data = ctx.data.write().await;
-        let cache = data.get_mut::<RoleCountCacheType>().unwrap();
-        old.roles
-            .iter()
-            .filter(|r| config.role_ids.contains(r))
-            .for_each(|r| cache.decrement(*r));
-    }
-
     async fn guild_member_update(
         &self,
         ctx: Context,
@@ -131,11 +117,9 @@ impl EventHandler for Handler {
         let has_old_role = old.roles.contains(&config.display_role_id);
 
         if has_new_role && !has_old_role {
-            Handler::role_added(&ctx, &new, config).await;
-            info!("added role to {}", new.user.name);
+            Handler::handle_role_assignment(&ctx, &new, config).await;
         } else if has_old_role && !has_new_role {
-            Handler::role_removed(&ctx, &old, config).await;
-            info!("removed role from {}", new.user.name);
+            Handler::handle_role_removal(&ctx, &old, config).await;
         }
     }
 }

@@ -36,21 +36,21 @@ pub async fn add_invite_role(ctx: ApplicationContext<'_, CommandData, PError>) -
 
     ctx.defer().await?;
 
-    let mut role_count = 0;
+    let mut added_count = 0;
 
     for member in members {
         if config.role_ids.iter().any(|r| member.roles.contains(r)) {
-            Handler::role_removed(ctx.serenity_context(), &member, config).await;
+            Handler::handle_role_removal(ctx.serenity_context(), &member, config).await;
         }
 
         if member.roles.contains(&config.display_role_id) {
-            Handler::role_added(ctx.serenity_context(), &member, config).await;
-            role_count += 1;
+            Handler::handle_role_assignment(ctx.serenity_context(), &member, config).await;
+            added_count += 1;
             continue;
         }
     }
 
-    say_reply(ctx.into(), format!("{} 人に招待用ロールを付与しました。", role_count)).await?;
+    say_reply(ctx.into(), format!("{} 人に招待用ロールを付与しました。", added_count)).await?;
     Ok(())
 }
 
@@ -70,7 +70,7 @@ pub async fn remove_invite_role(ctx: ApplicationContext<'_, CommandData, PError>
             continue;
         }
 
-        Handler::role_removed(ctx.serenity_context(), &member, config).await;
+        Handler::handle_role_removal(ctx.serenity_context(), &member, config).await;
         role_count += 1;
     }
 

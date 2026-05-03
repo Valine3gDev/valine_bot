@@ -17,7 +17,6 @@ pub use thread_auto_invite::ThreadAutoInviteHandler;
 pub use thread_channel_startup::Handler as ThreadChannelStartupHandler;
 
 pub use message_cache::{MessageCache, MessageCacheType};
-pub use thread_auto_invite::{RoleCountCache, RoleCountCacheType};
 
 use crate::PCommand;
 
