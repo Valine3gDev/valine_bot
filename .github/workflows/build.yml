@@ -56,7 +56,9 @@ jobs:
         uses: moonrepo/setup-rust@abb2d32350334249b178c401e5ec5836e0cd88d3 # v1.3.0
         with:
           targets: ${{ matrix.target }}
-          bins: cargo-zigbuild
+          bins: cargo-zigbuild,cargo-about
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       # moldをインストール
       - uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
@@ -76,11 +78,19 @@ jobs:
       - name: Copy and rename artifacts
         shell: bash
         run: |
-          mv target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }} ./target/release/
-          cp target/release/${{ env.PROJECT_NAME }}{,-${{ github.ref_name }}-${{ matrix.target }}}
-          cp target/release/${{ env.PROJECT_NAME }} target/release/${{ matrix.target }}
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }} dist/${{ matrix.target }}
+          cp LICENSE dist/LICENSE
+
+      - name: Generate third-party license notices
+        run: |
+          cargo about generate about.hbs \
+            --locked \
+            --fail \
+            --target ${{ matrix.target }} \
+            -o dist/THIRD_PARTY_LICENSES-${{ matrix.target }}
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: binary-${{ matrix.target }}
-          path: target/release/${{ matrix.target }}
+          name: ${{ matrix.target }}
+          path: dist/*

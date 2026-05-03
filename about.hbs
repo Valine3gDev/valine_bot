@@ -1,0 +1,35 @@
+Third-party license notices
+===========================
+
+This file lists license notices for third-party Rust crates used by this
+project. Distribute it with raw binaries published for this release.
+
+The license for this project itself is provided separately in LICENSE.
+
+Generated with:
+
+    cargo about generate about.hbs --locked --fail --target <target> -o THIRD_PARTY_LICENSES-<target>
+
+License overview
+----------------
+
+{{#each overview}}
+- {{{name}}} ({{count}})
+{{/each}}
+
+License texts
+-------------
+
+{{#each licenses}}
+================================================================================
+{{{name}}}
+================================================================================
+
+Used by:
+{{#each used_by}}
+- {{{crate.name}}} {{{crate.version}}}{{#if crate.repository}} ({{{crate.repository}}}){{else}} (https://crates.io/crates/{{{crate.name}}}){{/if}}
+{{/each}}
+
+{{{text}}}
+
+{{/each}}
