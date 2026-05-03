@@ -43,7 +43,7 @@ impl Handler {
         }
 
         let is_ignored = std::iter::once(channel.id)
-            .chain(channel.parent_id.into_iter())
+            .chain(channel.parent_id)
             .any(|id| config.message_cache.ignore_channel_ids.contains(&id));
         if is_ignored {
             return;
