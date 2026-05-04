@@ -24,11 +24,30 @@ sudo -iu valine-bot
 `main` ではなく、release tag または commit SHA に固定した raw URL を使ってください。
 
 ```sh
-podman quadlet install \
+podman quadlet install -r \
   https://raw.githubusercontent.com/Valine3gDev/valine_bot/vX.Y.Z/deploy/valine-bot.quadlets
 ```
 
 このリポジトリの GHCR image は release workflow で `ghcr.io/valine3gdev/valine_bot:2.4.2` のような `v` なしの semver tag として発行されます。別バージョンを使う場合は、インストール後に `$HOME/.config/containers/systemd/valine-bot.container` の `Image=` を更新してください。
+
+## 更新
+
+イメージタグなどを変更する場合:
+
+```sh
+nano $HOME/.config/containers/systemd/valine-bot.container
+
+systemctl --user daemon-reload
+systemctl --user restart valine-bot.service
+```
+
+ユーザーを切り替えずに更新する場合:
+
+```sh
+sudo -u valine-bot -H sh -lc '${EDITOR:-nano} "$HOME/.config/containers/systemd/valine-bot.container"'
+sudo systemctl --user --machine=valine-bot@.host daemon-reload
+sudo systemctl --user --machine=valine-bot@.host restart valine-bot.service
+```
 
 ## env file
 
@@ -38,17 +57,32 @@ podman quadlet install \
 curl -fsSLo valine-bot.env \
   https://raw.githubusercontent.com/Valine3gDev/valine_bot/vX.Y.Z/deploy/valine-bot.env.sample
 
-${EDITOR:-vi} valine-bot.env
+${EDITOR:-nano} valine-bot.env
 
 install -D -m 600 valine-bot.env "$HOME/.config/containers/systemd/valine-bot.env"
 rm -f valine-bot.env
+```
+
+## config file
+
+`$HOME/valine-bot/config.toml` を直接参照します。このファイルはコンテナ内の `/app/config.toml` として read-only mount されます。
+
+```sh
+mkdir -p "$HOME/valine-bot"
+chmod 700 "$HOME/valine-bot"
+
+curl -fsSLo "$HOME/valine-bot/config.toml" \
+  https://raw.githubusercontent.com/Valine3gDev/valine_bot/vX.Y.Z/config.sample.toml
+
+${EDITOR:-nano} "$HOME/valine-bot/config.toml"
+chmod 600 "$HOME/valine-bot/config.toml"
 ```
 
 ## 起動
 
 ```sh
 systemctl --user daemon-reload
-systemctl --user enable --now valine-bot-db.service valine-bot.service
+systemctl --user start valine-bot-db.service valine-bot.service
 ```
 
 ## 状態確認
@@ -61,8 +95,14 @@ systemctl --user status valine-bot.service
 ## ログ確認
 
 ```sh
-journalctl --user -u valine-bot.service -f
-journalctl --user -u valine-bot-db.service -f
+journalctl --user -axu valine-bot.service -f
+journalctl --user -axu valine-bot-db.service -f
+```
+
+ユーザーを切り替えずに
+```sh
+sudo -u valine-bot journalctl --user -axu valine-bot.service -f
+sudo -u valine-bot journalctl --user -axu valine-bot-db.service -f
 ```
 
 ## 停止
@@ -71,22 +111,15 @@ journalctl --user -u valine-bot-db.service -f
 systemctl --user stop valine-bot.service valine-bot-db.service
 ```
 
-自動起動も無効にする場合:
+## コンフィグ検証
 
 ```sh
-systemctl --user disable valine-bot.service valine-bot-db.service
-```
-
-## unit 名
-
-- `valine-bot-db.container` から `valine-bot-db.service` が生成されます。
-- `valine-bot.container` から `valine-bot.service` が生成されます。
-- `valine-bot.network` から network 用 unit (`valine-bot-network.service`) が生成されます。
-
-## DB volume
-
-DB データは Podman named volume の `valine-bot-db-data` に保存されます。rootless Podman では通常、実体は `~/.local/share/containers/storage/volumes/valine-bot-db-data/_data` 配下です。
-
-```sh
-podman volume inspect valine-bot-db-data
+podman run --rm \
+  --read-only \
+  --cap-drop=all \
+  --userns=keep-id \
+  --user "$(id -u):$(id -g)" \
+  --volume "$HOME/valine-bot/config.toml:/app/config.toml:ro" \
+  ghcr.io/valine3gdev/valine_bot:2.4.2 \
+  --check-config
 ```
