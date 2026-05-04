@@ -7,16 +7,12 @@ COPY dist dist
 
 RUN set -eu; \
     case "$TARGETPLATFORM" in \
-        "linux/amd64") \
-            cp dist/*x86_64-unknown-linux-gnu ./valine_bot; \
-            cp dist/THIRD_PARTY_LICENSES-x86_64-unknown-linux-gnu ./THIRD_PARTY_LICENSES \
-            ;; \
-        "linux/arm64") \
-            cp dist/*aarch64-unknown-linux-gnu ./valine_bot; \
-            cp dist/THIRD_PARTY_LICENSES-aarch64-unknown-linux-gnu ./THIRD_PARTY_LICENSES \
-            ;; \
+        "linux/amd64") target="x86_64-unknown-linux-gnu" ;; \
+        "linux/arm64") target="aarch64-unknown-linux-gnu" ;; \
         *) echo "Unsupported TARGETPLATFORM=$TARGETPLATFORM" >&2; exit 1 ;; \
     esac; \
+    cp dist/valine_bot-*-"$target" ./valine_bot; \
+    cp "dist/THIRD_PARTY_LICENSES-$target" ./THIRD_PARTY_LICENSES; \
     cp dist/LICENSE ./LICENSE; \
     chmod +x ./valine_bot
 
