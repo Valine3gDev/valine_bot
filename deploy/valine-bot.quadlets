@@ -1,0 +1,55 @@
+# FileName=valine-bot.network
+[Unit]
+Description=Valine Bot Podman network
+
+[Network]
+NetworkName=valine-bot-net
+
+---
+# FileName=valine-bot-db.container
+[Unit]
+Description=Valine Bot PostgreSQL database
+Requires=valine-bot.network
+After=valine-bot.network
+
+[Container]
+Image=docker.io/library/postgres:18.3
+ContainerName=valine-bot-db
+Network=valine-bot.network
+Volume=valine-bot-db-data:/var/lib/postgresql/data
+Environment=POSTGRES_DB=valine_bot
+Environment=POSTGRES_USER=valine_bot
+EnvironmentFile=./valine-bot.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+
+---
+# FileName=valine-bot.container
+[Unit]
+Description=Valine Bot application
+Requires=valine-bot.network
+Requires=valine-bot-db.container
+After=valine-bot.network
+After=valine-bot-db.container
+
+[Container]
+Image=ghcr.io/valine3gdev/valine_bot:2.4.2
+ContainerName=valine-bot
+Network=valine-bot.network
+Environment=DB_HOST=valine-bot-db
+Environment=DB_PORT=5432
+Environment=DB_NAME=valine_bot
+Environment=DB_USER=valine_bot
+EnvironmentFile=./valine-bot.env
+ReadOnly=true
+DropCapability=all
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
