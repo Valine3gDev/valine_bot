@@ -18,19 +18,14 @@ pub struct BasicQuestionData {
     #[min_length = 3]
     #[max_length = 20]
     pub loader: String,
-    #[name = "Modローダーのバージョン"]
-    #[placeholder = "使用しているModローダーのバージョンを入力してください"]
-    #[min_length = 3]
-    #[max_length = 20]
-    pub loader_version: String,
 }
 
 impl Display for BasicQuestionData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "### 基本情報\n- Minecraftバージョン: {}\n- Modローダー: {}\n- Modローダーバージョン: {}",
-            self.mc_version, self.loader, self.loader_version
+            "### 基本情報\n- Minecraftバージョン: {}\n- Modローダー: {}",
+            self.mc_version, self.loader
         )
     }
 }
@@ -56,14 +51,22 @@ pub struct DetailedQuestionData {
     #[max_length = 1000]
     #[paragraph]
     pub content3: String,
+    #[name = "mclo.gs にアップロードしたログやクラッシュレポートなどのリンク (任意)"]
+    #[placeholder = "mclo.gs にアップロードしたログやクラッシュレポートなどのリンクを入力してください"]
+    #[max_length = 1000]
+    #[paragraph]
+    pub logs: Option<String>,
 }
 
 impl Display for DetailedQuestionData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "### 質問内容\n- 質問内容:\n{}\n- 問題解決の達成基準:\n{}\n- 試したこと・調べたこと:\n{}",
-            self.content, self.content2, self.content3
+            "### 質問内容\n- 質問内容:\n{}\n- 問題解決の達成基準:\n{}\n- 試したこと・調べたこと:\n{}\n- ログやクラッシュレポートのリンク:\n{}",
+            self.content,
+            self.content2,
+            self.content3,
+            self.logs.as_deref().unwrap_or("なし")
         )
     }
 }
@@ -72,8 +75,11 @@ impl Default for DetailedQuestionData {
     fn default() -> Self {
         Self {
             content: "例:クラッシュした, 変な挙動をする, modの扱い方がわからない".to_string(),
-            content2: "例: クラッシュから抜け出したい, このような挙動にしたい, このmodでこのようなことがしたい".to_string(),
-            content3: "例:○○というサイトに掲載されてた対処法を試した\n推奨:mclo.gs にて変換したクラッシュレポート、lastet.logのリンクを貼る".to_string(),
+            content2: "例: クラッシュから抜け出したい, このような挙動にしたい, このmodでこのようなことがしたい"
+                .to_string(),
+            content3: "例:○○というサイトに掲載されてた対処法を試した\nAIに聞いてみてこのような回答を得られた\nなど"
+                .to_string(),
+            logs: None,
         }
     }
 }
