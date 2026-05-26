@@ -3,14 +3,7 @@ mod error;
 mod features;
 mod utils;
 
-use std::{
-    fs::read_to_string,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    time::Duration,
-};
+use std::{fs::read_to_string, sync::Arc, time::Duration};
 
 use bpaf::Bpaf;
 use config::Config;
@@ -24,6 +17,7 @@ use serenity::{
     prelude::*,
 };
 use sysinfo::{Pid, System};
+use tokio::task::JoinHandle;
 use tracing::{error, info, warn};
 
 pub type PError = Box<dyn std::error::Error + Send + Sync>;
@@ -32,13 +26,13 @@ pub type PContext<'a> = poise::Context<'a, CommandData, PError>;
 pub type PCommand = poise::Command<CommandData, PError>;
 
 struct MainHandler {
-    task_started: AtomicBool,
+    activity_task: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl MainHandler {
     pub fn new() -> Self {
         Self {
-            task_started: AtomicBool::new(false),
+            activity_task: Mutex::new(None),
         }
     }
 }
@@ -50,27 +44,28 @@ impl EventHandler for MainHandler {
     }
 
     async fn cache_ready(&self, ctx: Context, _: Vec<GuildId>) {
-        if self.task_started.swap(true, Ordering::Relaxed) {
-            return;
+        let mut task = self.activity_task.lock().await;
+
+        if let Some(handle) = task.take() {
+            handle.abort();
         }
 
-        tokio::spawn(async move {
+        *task = Some(tokio::spawn(async move {
             let mut system = System::new_all();
             let pid = Pid::from_u32(std::process::id());
 
             loop {
                 system.refresh_all();
 
-                let Some(memory) = system.process(pid).map(|p| p.memory() as f64 / 1024.0 / 1024.0) else {
+                if let Some(memory) = system.process(pid).map(|p| p.memory() as f64 / 1024.0 / 1024.0) {
+                    ctx.set_activity(Some(ActivityData::custom(format!("メモリ使用量: {:.1}MB", memory))));
+                } else {
                     error!("Failed to get process info");
-                    continue;
-                };
-
-                ctx.set_activity(Some(ActivityData::custom(format!("メモリ使用量: {:.1}MB", memory))));
+                }
 
                 tokio::time::sleep(Duration::from_secs(60)).await;
             }
-        });
+        }));
     }
 
     async fn guild_create(&self, ctx: Context, guild: Guild, _: Option<bool>) {
