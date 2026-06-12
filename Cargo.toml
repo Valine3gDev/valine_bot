@@ -20,6 +20,8 @@ serde_with = "3"
 similar = "3.1"
 sysinfo = "0.38"
 thiserror = "2"
+# 最新の Serenity と time 0.3.48 に互換性がない
+time = "=0.3.47"
 tokio = { version = "1.0", features = [ "rt-multi-thread", "macros", "signal" ] }
 toml = "1.0"
 tracing = "0.1"
@@ -32,6 +34,11 @@ rev = "30a293f0a02c63908b68a9f4fa687e964b7ff5c8"
 [dependencies.poise]
 git = "https://github.com/serenity-rs/poise"
 rev = "de8bd6fdd54de8ee5daf0242ffb6dc6eba58df69"
+
+# Poise が next ブランチを参照しているので、直接の依存関係に合わせる
+[replace."https://github.com/serenity-rs/serenity#serenity:0.12.5"]
+git = "https://github.com/serenity-rs/serenity"
+rev = "30a293f0a02c63908b68a9f4fa687e964b7ff5c8"
 
 [profile.release]
 panic = "abort"
