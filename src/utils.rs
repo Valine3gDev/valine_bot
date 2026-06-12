@@ -83,7 +83,7 @@ pub async fn has_authed_role(ctx: AppContext<'_>) -> Result<bool, AppError> {
         return Ok(false);
     };
 
-    let config = ctx.get_app_config();
+    let config = ctx.read_app_config().await;
     if !member.roles.contains(&config.auth.role_id) {
         Err(BotError::HasNoRole.into())
     } else {

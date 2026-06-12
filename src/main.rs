@@ -37,16 +37,15 @@ async fn main() {
         return;
     }
 
-    let data = Arc::new(BotData {
-        config: Arc::new(config),
-    });
+    let config = Arc::new(config);
+    let data = Arc::new(BotData::new(&config));
 
     let framework = Framework::builder()
         .options(FrameworkOptions {
             commands: commands(),
             on_error: |error| Box::pin(on_error(error)),
             skip_checks_for_owners: false,
-            owners: data.config.bot.owners.clone(),
+            owners: config.bot.owners.clone(),
             ..Default::default()
         })
         .build();
@@ -60,7 +59,7 @@ async fn main() {
     settings.max_messages = 1_000_000;
 
     let mut client = create_client(
-        data.config.bot.token.clone(),
+        config.bot.token.clone(),
         intents,
         BotEventHandlers::new().add(MainEventHandler::new()),
     )
