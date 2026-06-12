@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use async_stream::stream;
 use futures::Stream;
@@ -14,12 +14,7 @@ use serenity::{
 use similar::{Algorithm, ChangeTag, TextDiff};
 use tracing::error;
 
-use crate::{
-    config::get_config,
-    error::BotError,
-    // MessageCacheType,
-    types::{PContext, PError},
-};
+use crate::app::{AppContext, AppError, BotDataGetter, BotError};
 
 // pub fn create_safe_message() -> CreateMessage {
 //     CreateMessage::new().allowed_mentions(CreateAllowedMentions::new().all_users(false))
@@ -83,13 +78,13 @@ use crate::{
 /*
 認証済みロールを持っているかどうかを確認します。
 */
-pub async fn has_authed_role(ctx: PContext<'_>) -> Result<bool, PError> {
+pub async fn has_authed_role(ctx: AppContext<'_>) -> Result<bool, AppError> {
     let Some(member) = ctx.author_member().await else {
         return Ok(false);
     };
 
-    let config = &get_config(ctx.serenity_context()).await.auth;
-    if !member.roles.contains(&config.role_id) {
+    let config = ctx.get_app_config();
+    if !member.roles.contains(&config.auth.role_id) {
         Err(BotError::HasNoRole.into())
     } else {
         Ok(true)

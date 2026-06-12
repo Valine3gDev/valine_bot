@@ -2,7 +2,10 @@ use poise::{FrameworkError, say_reply};
 use thiserror::Error;
 use tracing::error;
 
-use crate::{data::BotData, types::PError, utils::format_duration};
+use crate::{
+    app::{AppError, BotData},
+    utils::format_duration,
+};
 
 #[derive(Error, Debug)]
 pub enum BotError {
@@ -14,7 +17,7 @@ pub enum BotError {
     IsPrivateThread,
 }
 
-pub async fn on_error(error: FrameworkError<'_, BotData, PError>) {
+pub async fn on_error(error: FrameworkError<'_, BotData, AppError>) {
     match error {
         FrameworkError::Command { error, ctx, .. } => {
             let _ = say_reply(ctx, "コマンド実行中にエラーが発生しました。").await;

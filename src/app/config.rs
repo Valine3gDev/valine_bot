@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
+    path::Path,
 };
 
 use chrono::Duration;
@@ -8,16 +8,11 @@ use duration_str::deserialize_duration_chrono;
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
 use serde_with::{DisplayFromStr, serde_as};
-use serenity::all::{ChannelId, Context, ForumTagId, GuildId, RoleId, Token, UserId};
-
-use crate::data::{BotData, BotDataGetter};
-
-pub async fn get_config(ctx: &Context) -> Arc<Config> {
-    Arc::clone(&ctx.get_bot_data().config)
-}
+use serenity::all::{ChannelId, ForumTagId, GuildId, RoleId, Token, UserId};
+use tokio::fs::read_to_string;
 
 #[derive(Debug, Deserialize)]
-pub struct Config {
+pub struct AppConfig {
     pub bot: BotConfig,
     pub auth: AuthConfig,
     pub auto_kick: AutoKickConfig,
@@ -28,6 +23,15 @@ pub struct Config {
     pub thread_channel_startup: ThreadChannelStartupConfig,
     pub thread_auto_invite: ThreadAutoInviteConfig,
     pub question: QuestionConfig,
+}
+
+impl AppConfig {
+    pub async fn from_file(path: &str) -> Self {
+        let text = read_to_string(path)
+            .await
+            .unwrap_or_else(|e| panic!("Failed to read {path}: {e}"));
+        toml::from_str(&text).unwrap_or_else(|e| panic!("Failed to parse {path}: {e}"))
+    }
 }
 
 #[derive(Debug, Deserialize)]

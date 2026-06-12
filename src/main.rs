@@ -1,28 +1,20 @@
-mod config;
+mod app;
 mod core;
-mod data;
-mod error;
 mod extensions;
-mod main_event_handler;
-mod types;
-// mod features;
+mod features;
 mod utils;
 
-use std::{fs::read_to_string, sync::Arc};
+use std::sync::Arc;
 
 use bpaf::Bpaf;
-use config::Config;
-// use error::on_error;
-// use features::{MessageCache, MessageCacheType, commands};
 use poise::{Framework, FrameworkOptions};
 use serenity::{cache::Settings as CacheSettings, prelude::*};
 use tracing::error;
 
 use crate::{
+    app::{BotData, MainEventHandler, config::AppConfig, on_error},
     core::{BotEventHandlers, create_client},
-    data::BotData,
-    error::on_error,
-    main_event_handler::MainEventHandler,
+    features::commands,
 };
 
 #[derive(Clone, Debug, Bpaf)]
@@ -36,8 +28,7 @@ struct Options {
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let config = read_to_string("config.toml").expect("Failed to read config.toml");
-    let config = toml::from_str::<Config>(&config).unwrap_or_else(|e| panic!("Failed to parse config.toml: {}", e));
+    let config = AppConfig::from_file("config.toml").await;
 
     let options = options().run();
 
@@ -52,7 +43,7 @@ async fn main() {
 
     let framework = Framework::builder()
         .options(FrameworkOptions {
-            // commands: commands(),
+            commands: commands(),
             on_error: |error| Box::pin(on_error(error)),
             skip_checks_for_owners: false,
             owners: data.config.bot.owners.clone(),
