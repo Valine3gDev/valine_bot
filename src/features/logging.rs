@@ -3,9 +3,8 @@ use std::ops::Not;
 use itertools::{Itertools, enumerate};
 use serenity::{
     all::{
-        ChannelId, Context, CreateEmbed, EmbedMessageBuilding, EventHandler, FormattedTimestamp,
-        FormattedTimestampStyle, GuildId, Mentionable, Message, MessageBuilder, MessageId, MessageReferenceKind,
-        MessageUpdateEvent, Timestamp,
+        ChannelId, Context, CreateEmbed, EmbedMessageBuilding, EventHandler, GuildId, Mentionable, Message,
+        MessageBuilder, MessageId, MessageReferenceKind, MessageUpdateEvent, Timestamp,
     },
     async_trait,
 };
@@ -13,9 +12,42 @@ use tracing::error;
 
 use crate::{
     config::get_config,
+    extensions::MessageBuilderTimestampExt,
     features::MessageCacheType,
     utils::{create_diff_lines_text, create_safe_message, get_cached_message, send_message},
 };
+
+enum LogType {
+    Edit { new_content: String },
+    Delete,
+}
+
+impl LogType {
+    fn name(&self) -> &'static str {
+        match self {
+            LogType::Edit { .. } => "編集",
+            LogType::Delete => "削除",
+        }
+    }
+
+    fn title(&self) -> String {
+        format!("メッセージ{}ログ", self.name())
+    }
+
+    fn color(&self) -> i32 {
+        match self {
+            LogType::Edit { .. } => 0xff8800,
+            LogType::Delete => 0xf00000,
+        }
+    }
+
+    fn new_content(&self) -> Option<&str> {
+        match self {
+            LogType::Edit { new_content } => Some(new_content),
+            LogType::Delete => None,
+        }
+    }
+}
 
 pub struct Handler;
 
@@ -64,9 +96,9 @@ impl Handler {
         }
 
         if let Some(expiry) = poll.expiry {
-            builder.push_bold_safe("有効期限: ").push_line_safe(
-                FormattedTimestamp::new(expiry, Some(FormattedTimestampStyle::LongDateTime)).to_string(),
-            );
+            builder
+                .push_bold_safe("有効期限: ")
+                .push_timestamp_long_date_time_line(expiry);
         }
 
         embed.field("__**投票**__", builder.build(), false)
@@ -108,26 +140,18 @@ impl Handler {
         embed.field("__**添付ファイル**__", builder.build(), false)
     }
 
-    fn build_embed(&self, message: &Message, new_content: String, mut embed: CreateEmbed) -> CreateEmbed {
+    fn build_embed(&self, message: &Message, new_content: &str, mut embed: CreateEmbed) -> CreateEmbed {
         embed = Self::build_reply_field(embed, message);
         embed = Self::build_poll_field(embed, message);
-        embed = Self::build_diff_field(embed, &message.content, &new_content);
+        embed = Self::build_diff_field(embed, &message.content, new_content);
         Self::build_attachments_field(embed, message)
     }
 
-    async fn create_and_send_log(
-        &self,
-        ctx: &Context,
-        message: &Message,
-        title: &str,
-        color: i32,
-        new_content: Option<String>,
-    ) {
+    async fn create_and_send_log(&self, ctx: &Context, message: &Message, log_type: LogType) {
         if message.author.bot {
             return;
         }
 
-        let timestamp = FormattedTimestamp::new(Timestamp::now(), Some(FormattedTimestampStyle::LongDateTime));
         let description = MessageBuilder::new()
             .push_bold_safe("メンバー: ")
             .mention(&message.author.mention())
@@ -137,14 +161,16 @@ impl Handler {
             .push_safe(message.id.link(message.channel_id, message.guild_id))
             .push_safe(" ")
             .push_mono_line_safe(message.id.to_string())
-            .push_bold_safe("時刻: ")
-            .push_line_safe(timestamp.to_string())
+            .push_bold_safe("メッセージ送信日時: ")
+            .push_timestamp_long_date_time_line(message.timestamp)
+            .push_bold_safe(format!("{}日時: ", log_type.name()))
+            .push_timestamp_long_date_time_line(Timestamp::now())
             .build();
 
         let mut embed = CreateEmbed::new()
-            .title(title)
+            .title(log_type.title())
             .description(description)
-            .color(color)
+            .color(log_type.color())
             .thumbnail(
                 message
                     .author
@@ -152,7 +178,8 @@ impl Handler {
                     .unwrap_or("https://cdn.discordapp.com/embed/avatars/0.png".to_string()),
             );
 
-        embed = self.build_embed(message, new_content.unwrap_or("".to_string()), embed);
+        let new_content = log_type.new_content().unwrap_or("");
+        embed = self.build_embed(message, new_content, embed);
         self.send_log(ctx, embed).await;
     }
 
@@ -189,9 +216,9 @@ impl EventHandler for Handler {
         self.create_and_send_log(
             &ctx,
             &message,
-            "メッセージ編集ログ",
-            0xff8800,
-            Some(new_message.content),
+            LogType::Edit {
+                new_content: new_message.content,
+            },
         )
         .await;
     }
@@ -207,7 +234,22 @@ impl EventHandler for Handler {
             return error!("Failed to get message: {}", deleted_message_id);
         };
 
-        self.create_and_send_log(&ctx, &message, "メッセージ削除ログ", 0xf00000, None)
-            .await;
+        self.create_and_send_log(&ctx, &message, LogType::Delete).await;
+    }
+
+    async fn message_delete_bulk(
+        &self,
+        ctx: Context,
+        channel_id: ChannelId,
+        deleted_message_ids: Vec<MessageId>,
+        _: Option<GuildId>,
+    ) {
+        for message_id in deleted_message_ids {
+            let Some(message) = get_cached_message(&ctx, channel_id, message_id).await else {
+                error!("Failed to get message: {}", message_id);
+                continue;
+            };
+            self.create_and_send_log(&ctx, &message, LogType::Delete).await;
+        }
     }
 }
