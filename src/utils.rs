@@ -1,28 +1,22 @@
-use std::{sync::Arc, time::Duration};
+use std::{borrow::Cow, time::Duration};
 
-use async_stream::stream;
-use futures::Stream;
 use itertools::Itertools;
 use serenity::{
     Result,
-    all::{
-        ChannelId, ChannelType, Context, CreateActionRow, CreateAllowedMentions, CreateInteractionResponse,
-        CreateInteractionResponseMessage, CreateMessage, GuildChannel, GuildId, Http, LightMethod, Member, Message,
-        MessageId, Request, Route, ThreadsData, Timestamp,
-    },
+    all::{ChannelId, Context, CreateAllowedMentions, CreateMessage, Message},
 };
 use similar::{Algorithm, ChangeTag, TextDiff};
 use tracing::error;
 
 use crate::app::{AppContext, AppError, BotDataGetter, BotError};
 
-// pub fn create_safe_message() -> CreateMessage {
-//     CreateMessage::new().allowed_mentions(CreateAllowedMentions::new().all_users(false))
-// }
+pub fn create_safe_message<'a>() -> CreateMessage<'a> {
+    CreateMessage::new().allowed_mentions(CreateAllowedMentions::new().all_users(false))
+}
 
-// pub fn create_message(content: impl Into<String>) -> CreateMessage {
-//     create_safe_message().content(content)
-// }
+pub fn create_message<'a>(content: impl Into<Cow<'a, str>>) -> CreateMessage<'a> {
+    create_safe_message().content(content)
+}
 
 // pub fn create_interaction_message(
 //     content: impl Into<String>,
@@ -123,15 +117,15 @@ pub fn format_duration(duration: Duration, mut count: usize) -> String {
     parts.join(" ")
 }
 
-// pub async fn send_message(ctx: &Context, channel_id: &ChannelId, builder: CreateMessage) -> Result<Message> {
-//     match channel_id.send_message(&ctx.http, builder).await {
-//         Ok(m) => Ok(m),
-//         Err(why) => {
-//             error!("Error sending message: {:?}", why);
-//             Err(why)
-//         }
-//     }
-// }
+pub async fn send_message<'a>(ctx: &Context, channel_id: &ChannelId, builder: CreateMessage<'a>) -> Result<Message> {
+    match channel_id.widen().send_message(&ctx.http, builder).await {
+        Ok(m) => Ok(m),
+        Err(why) => {
+            error!("Error sending message: {:?}", why);
+            Err(why)
+        }
+    }
+}
 
 // pub async fn get_cached_message(ctx: &Context, channel_id: ChannelId, message_id: MessageId) -> Option<Message> {
 //     if let Some(m) = ctx.cache.message(channel_id, message_id) {

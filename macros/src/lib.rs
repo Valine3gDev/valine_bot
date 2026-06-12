@@ -3,7 +3,7 @@ use quote::quote;
 use syn::{FnArg, ItemFn, ReturnType, parse_macro_input};
 
 #[proc_macro_attribute]
-pub fn simple_event_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn event_handler(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let function = parse_macro_input!(item as ItemFn);
 
     if function.sig.asyncness.is_none() {
@@ -60,7 +60,7 @@ pub fn simple_event_handler(_attr: TokenStream, item: TokenStream) -> TokenStrea
         #visibility struct #handler_name;
 
         #[::serenity::async_trait]
-        impl crate::BotEventHandler for #handler_name {
+        impl crate::core::BotEventHandler for #handler_name {
             async fn dispatch(&self, #inputs) #body
         }
     }
