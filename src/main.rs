@@ -135,6 +135,7 @@ async fn main() {
         .event_handler(MainHandler::new())
         .event_handler(features::AuthHandler::new())
         .event_handler(features::AutoKickHandler::new())
+        .event_handler(features::HoneypotHandler)
         .event_handler(features::LoggingHandler)
         .event_handler(features::ThreadAutoInviteHandler::new())
         .event_handler(features::ThreadChannelStartupHandler)

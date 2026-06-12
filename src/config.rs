@@ -24,6 +24,7 @@ pub struct Config {
     pub bot: BotConfig,
     pub auth: AuthConfig,
     pub auto_kick: AutoKickConfig,
+    pub honeypot: HoneypotConfig,
     pub message_logging: MessageLoggingConfig,
     pub message_cache: MessageCacheConfig,
     pub pin: PinConfig,
@@ -58,6 +59,15 @@ pub struct AutoKickConfig {
     #[serde(deserialize_with = "deserialize_duration_chrono")]
     pub grace_period: Duration,
     pub kick_message: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HoneypotConfig {
+    pub channel_id: ChannelId,
+    #[serde(deserialize_with = "deserialize_duration_chrono")]
+    pub message_lookback: Duration,
+    pub kick_message: String,
+    pub log_channel_id: ChannelId,
 }
 
 #[derive(Debug, Deserialize)]
