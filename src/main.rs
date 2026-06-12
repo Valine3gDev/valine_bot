@@ -12,7 +12,7 @@ use serenity::{cache::Settings as CacheSettings, prelude::*};
 use tracing::error;
 
 use crate::{
-    app::{BotData, MainEventHandler, config::AppConfig, on_error},
+    app::{AppError, BotData, MainEventHandler, config::AppConfig, on_error},
     core::{BotEventHandlers, create_client},
     features::commands,
 };
@@ -25,20 +25,17 @@ struct Options {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), AppError> {
     tracing_subscriber::fmt::init();
 
-    let config = AppConfig::from_file("config.toml").await;
+    let config = AppConfig::from_file("config.toml").await?;
 
     let options = options().run();
 
     if options.check_config {
         println!("Config is valid");
-        return;
+        return Ok(());
     }
-
-    let config = Arc::new(config);
-    let data = Arc::new(BotData::new(&config));
 
     let framework = Framework::builder()
         .options(FrameworkOptions {
@@ -73,7 +70,7 @@ async fn main() {
     // .event_handler(features::QuestionHandler)
     // .event_handler(features::MessageCacheHandler::new(config.message_cache.disabled))
     .cache_settings(settings)
-    .data(Arc::new(data))
+    .data(Arc::new(BotData::new(config)))
     // .type_map_insert::<MessageCacheType>(Arc::new(MessageCache::new()))
     .await
     .expect("Err creating client");
@@ -89,4 +86,6 @@ async fn main() {
     if let Err(why) = client.start().await {
         error!("Client error: {:?}", why);
     }
+
+    Ok(())
 }

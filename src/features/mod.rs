@@ -1,4 +1,4 @@
-// mod admin;
+mod admin;
 // mod auth;
 // mod auto_kick;
 // mod honeypot;
@@ -29,7 +29,7 @@ pub fn commands() -> Vec<AppCommand> {
         // auth::create_keyword_button,
         // question::question,
         // pin::pin,
-        // admin::reload_config,
+        admin::reload_config,
         // thread_auto_invite::invite_thread,
         // thread_auto_invite::add_invite_role,
         // thread_auto_invite::remove_invite_role,

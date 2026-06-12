@@ -10,9 +10,9 @@ pub struct BotData {
 }
 
 impl BotData {
-    pub fn new(config: &Arc<AppConfig>) -> Self {
+    pub fn new(config: AppConfig) -> Self {
         Self {
-            config: RwLock::new(Arc::clone(config)),
+            config: RwLock::new(Arc::new(config)),
         }
     }
 }

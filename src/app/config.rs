@@ -11,6 +11,8 @@ use serde_with::{DisplayFromStr, serde_as};
 use serenity::all::{ChannelId, ForumTagId, GuildId, RoleId, Token, UserId};
 use tokio::fs::read_to_string;
 
+use crate::app::AppError;
+
 #[derive(Debug, Deserialize)]
 pub struct AppConfig {
     pub bot: BotConfig,
@@ -26,11 +28,9 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    pub async fn from_file(path: &str) -> Self {
-        let text = read_to_string(path)
-            .await
-            .unwrap_or_else(|e| panic!("Failed to read {path}: {e}"));
-        toml::from_str(&text).unwrap_or_else(|e| panic!("Failed to parse {path}: {e}"))
+    pub async fn from_file(path: &str) -> Result<Self, AppError> {
+        let text = read_to_string(path).await?;
+        Ok(toml::from_str(&text)?)
     }
 }
 
