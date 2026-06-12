@@ -2617,6 +2617,15 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-subscriber",
+ "valine_bot_macros",
+]
+
+[[package]]
+name = "valine_bot_macros"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]

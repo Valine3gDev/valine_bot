@@ -1,9 +1,8 @@
 use poise::{FrameworkError, say_reply};
-use serenity::all::MessageParseError;
 use thiserror::Error;
 use tracing::error;
 
-use crate::{CommandData, PError, utils::format_duration};
+use crate::{data::BotData, types::PError, utils::format_duration};
 
 #[derive(Error, Debug)]
 pub enum BotError {
@@ -15,7 +14,7 @@ pub enum BotError {
     IsPrivateThread,
 }
 
-pub async fn on_error(error: FrameworkError<'_, CommandData, PError>) {
+pub async fn on_error(error: FrameworkError<'_, BotData, PError>) {
     match error {
         FrameworkError::Command { error, ctx, .. } => {
             let _ = say_reply(ctx, "コマンド実行中にエラーが発生しました。").await;
@@ -26,15 +25,15 @@ pub async fn on_error(error: FrameworkError<'_, CommandData, PError>) {
                 return error!("Error parsing input: {:?}", error);
             };
 
-            let error = match error.downcast_ref::<MessageParseError>() {
-                Some(MessageParseError::Malformed) => {
-                    "メッセージとして解析できませんでした。\nメッセージID、メッセージURL形式で入力してください。"
-                }
-                Some(MessageParseError::Http(_)) => "メッセージを取得できませんでした。",
-                _ => &error.to_string(),
-            };
+            // let error = match error.downcast_ref::<MessageParseError>() {
+            //     Some(MessageParseError::Malformed) => {
+            //         "メッセージとして解析できませんでした。\nメッセージID、メッセージURL形式で入力してください。"
+            //     }
+            //     Some(MessageParseError::Http(_)) => "メッセージを取得できませんでした。",
+            //     _ => &error.to_string(),
+            // };
 
-            let _ = say_reply(ctx, format!("入力 `{}` の解析に失敗しました。\n{}", input, error)).await;
+            let _ = say_reply(ctx, format!("入力 `{}` の解析に失敗しました。\n{:?}", input, error)).await;
         }
         FrameworkError::MissingBotPermissions {
             missing_permissions,

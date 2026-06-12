@@ -8,15 +8,12 @@ use duration_str::deserialize_duration_chrono;
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
 use serde_with::{DisplayFromStr, serde_as};
-use serenity::{
-    all::{ChannelId, Context, ForumTagId, GuildId, RoleId, UserId},
-    prelude::TypeMapKey,
-};
+use serenity::all::{ChannelId, Context, ForumTagId, GuildId, RoleId, Token, UserId};
+
+use crate::data::{BotData, BotDataGetter};
 
 pub async fn get_config(ctx: &Context) -> Arc<Config> {
-    let data = ctx.data.read().await;
-    let config = data.get::<Config>().expect("Expected MessageCount in TypeMap.");
-    config.clone()
+    Arc::clone(&ctx.get_bot_data().config)
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,13 +30,9 @@ pub struct Config {
     pub question: QuestionConfig,
 }
 
-impl TypeMapKey for Config {
-    type Value = Arc<Config>;
-}
-
 #[derive(Debug, Deserialize)]
 pub struct BotConfig {
-    pub token: String,
+    pub token: Token,
     pub owners: HashSet<UserId>,
 }
 

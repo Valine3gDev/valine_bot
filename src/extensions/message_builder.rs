@@ -5,71 +5,112 @@ use serenity::{
 
 #[allow(dead_code)]
 pub trait MessageBuilderTimestampExt {
-    fn _push_linebreak(&mut self) -> &mut Self;
+    fn push_timestamp(self, timestamp: Timestamp, style: Option<FormattedTimestampStyle>) -> Self;
+    fn push_timestamp_line(self, timestamp: Timestamp, style: Option<FormattedTimestampStyle>) -> Self;
 
-    fn push_timestamp(&mut self, timestamp: Timestamp, style: Option<FormattedTimestampStyle>) -> &mut Self;
+    fn push_short_timestamp(self, timestamp: Timestamp) -> Self;
+    fn push_short_timestamp_line(self, timestamp: Timestamp) -> Self;
 
-    fn push_timestamp_line(&mut self, timestamp: Timestamp, style: Option<FormattedTimestampStyle>) -> &mut Self {
-        self.push_timestamp(timestamp, style)._push_linebreak()
-    }
+    fn push_medium_timestamp(self, timestamp: Timestamp) -> Self;
+    fn push_medium_timestamp_line(self, timestamp: Timestamp) -> Self;
 
-    fn push_timestamp_short(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::ShortTime))
-    }
-    fn push_timestamp_short_line(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp_short(timestamp)._push_linebreak()
-    }
+    fn push_short_date_timestamp(self, timestamp: Timestamp) -> Self;
+    fn push_short_date_timestamp_line(self, timestamp: Timestamp) -> Self;
 
-    fn push_timestamp_long(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::LongTime))
-    }
-    fn push_timestamp_long_line(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp_long(timestamp)._push_linebreak()
-    }
+    fn push_long_date_timestamp(self, timestamp: Timestamp) -> Self;
+    fn push_long_date_timestamp_line(self, timestamp: Timestamp) -> Self;
 
-    fn push_timestamp_short_date(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::ShortDate))
-    }
-    fn push_timestamp_short_date_line(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp_short_date(timestamp)._push_linebreak()
-    }
+    fn push_long_date_short_timestamp(self, timestamp: Timestamp) -> Self;
+    fn push_long_date_short_timestamp_line(self, timestamp: Timestamp) -> Self;
 
-    fn push_timestamp_long_date(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::LongDate))
-    }
-    fn push_timestamp_long_date_line(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp_long_date(timestamp)._push_linebreak()
-    }
+    fn push_full_date_short_timestamp(self, timestamp: Timestamp) -> Self;
+    fn push_full_date_short_timestamp_line(self, timestamp: Timestamp) -> Self;
 
-    fn push_timestamp_short_date_time(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::ShortDateTime))
-    }
-    fn push_timestamp_short_date_time_line(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp_short_date_time(timestamp)._push_linebreak()
-    }
+    fn push_short_date_short_timestamp(self, timestamp: Timestamp) -> Self;
+    fn push_short_date_short_timestamp_line(self, timestamp: Timestamp) -> Self;
 
-    fn push_timestamp_long_date_time(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::LongDateTime))
-    }
-    fn push_timestamp_long_date_time_line(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp_long_date_time(timestamp)._push_linebreak()
-    }
+    fn push_short_date_medium_timestamp(self, timestamp: Timestamp) -> Self;
+    fn push_short_date_medium_timestamp_line(self, timestamp: Timestamp) -> Self;
 
-    fn push_timestamp_relative_time(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::RelativeTime))
-    }
-    fn push_timestamp_relative_time_line(&mut self, timestamp: Timestamp) -> &mut Self {
-        self.push_timestamp_relative_time(timestamp)._push_linebreak()
-    }
+    fn push_relative_timestamp(self, timestamp: Timestamp) -> Self;
+    fn push_timestamp_relative_time_line(self, timestamp: Timestamp) -> Self;
+}
+
+fn _push_linebreak(mut builder: MessageBuilder) -> MessageBuilder {
+    builder.0.push('\n');
+    builder
 }
 
 impl MessageBuilderTimestampExt for MessageBuilder {
-    fn push_timestamp(&mut self, timestamp: Timestamp, style: Option<FormattedTimestampStyle>) -> &mut Self {
+    fn push_timestamp(mut self, timestamp: Timestamp, style: Option<FormattedTimestampStyle>) -> Self {
         let formatted = FormattedTimestamp::new(timestamp, style).to_string();
-        self.push(formatted)
+        self.0.push_str(&formatted);
+        self
+    }
+    fn push_timestamp_line(self, timestamp: Timestamp, style: Option<FormattedTimestampStyle>) -> Self {
+        _push_linebreak(self.push_timestamp(timestamp, style))
     }
 
-    fn _push_linebreak(&mut self) -> &mut Self {
-        self.push_line("")
+    fn push_short_timestamp(self, timestamp: Timestamp) -> Self {
+        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::ShortTime))
+    }
+    fn push_short_timestamp_line(self, timestamp: Timestamp) -> Self {
+        _push_linebreak(self.push_short_timestamp(timestamp))
+    }
+
+    fn push_medium_timestamp(self, timestamp: Timestamp) -> Self {
+        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::MediumTime))
+    }
+    fn push_medium_timestamp_line(self, timestamp: Timestamp) -> Self {
+        _push_linebreak(self.push_medium_timestamp(timestamp))
+    }
+
+    fn push_short_date_timestamp(self, timestamp: Timestamp) -> Self {
+        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::ShortDate))
+    }
+    fn push_short_date_timestamp_line(self, timestamp: Timestamp) -> Self {
+        _push_linebreak(self.push_short_date_timestamp(timestamp))
+    }
+
+    fn push_long_date_timestamp(self, timestamp: Timestamp) -> Self {
+        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::LongDate))
+    }
+    fn push_long_date_timestamp_line(self, timestamp: Timestamp) -> Self {
+        _push_linebreak(self.push_long_date_timestamp(timestamp))
+    }
+
+    fn push_long_date_short_timestamp(self, timestamp: Timestamp) -> Self {
+        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::LongDateShortTime))
+    }
+    fn push_long_date_short_timestamp_line(self, timestamp: Timestamp) -> Self {
+        _push_linebreak(self.push_long_date_short_timestamp(timestamp))
+    }
+
+    fn push_full_date_short_timestamp(self, timestamp: Timestamp) -> Self {
+        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::FullDateShortTime))
+    }
+    fn push_full_date_short_timestamp_line(self, timestamp: Timestamp) -> Self {
+        _push_linebreak(self.push_full_date_short_timestamp(timestamp))
+    }
+
+    fn push_short_date_short_timestamp(self, timestamp: Timestamp) -> Self {
+        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::ShortDateShortTime))
+    }
+    fn push_short_date_short_timestamp_line(self, timestamp: Timestamp) -> Self {
+        _push_linebreak(self.push_short_date_short_timestamp(timestamp))
+    }
+
+    fn push_short_date_medium_timestamp(self, timestamp: Timestamp) -> Self {
+        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::ShortDateMediumTime))
+    }
+    fn push_short_date_medium_timestamp_line(self, timestamp: Timestamp) -> Self {
+        _push_linebreak(self.push_short_date_medium_timestamp(timestamp))
+    }
+
+    fn push_relative_timestamp(self, timestamp: Timestamp) -> Self {
+        self.push_timestamp(timestamp, Some(FormattedTimestampStyle::RelativeTime))
+    }
+    fn push_timestamp_relative_time_line(self, timestamp: Timestamp) -> Self {
+        _push_linebreak(self.push_relative_timestamp(timestamp))
     }
 }

@@ -26,6 +26,7 @@ tokio = { version = "1.0", features = [ "rt-multi-thread", "macros", "signal" ] 
 toml = "1.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+valine_bot_macros = { path = "macros" }
 
 [dependencies.serenity]
 git = "https://github.com/serenity-rs/serenity"
