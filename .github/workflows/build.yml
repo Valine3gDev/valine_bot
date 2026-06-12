@@ -55,13 +55,12 @@ jobs:
       - name: Install Rust toolchain
         uses: moonrepo/setup-rust@abb2d32350334249b178c401e5ec5836e0cd88d3 # v1.3.0
         with:
+          cache-target: release
+          cache-extra-identifier: ${{ matrix.target }}
           targets: ${{ matrix.target }}
           bins: cargo-zigbuild,cargo-about
         env:
           GITHUB_TOKEN: ${{ github.token }}
-
-      - name: Cache cargo registry and build artifacts
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
       # moldをインストール
       - uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
