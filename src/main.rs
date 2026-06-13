@@ -13,8 +13,8 @@ use tracing::error;
 
 use crate::{
     app::{AppError, BotData, MainEventHandler, config::AppConfig, on_error},
-    core::{BotEventHandlers, create_client},
-    features::{AutoKickEventHandler, commands, handle_honeypot_event},
+    core::create_client,
+    features::{commands, event_handlers},
 };
 
 #[derive(Clone, Debug, Bpaf)]
@@ -58,10 +58,7 @@ async fn main() -> Result<(), AppError> {
     let mut client = create_client(
         config.bot.token.clone(),
         intents,
-        BotEventHandlers::new()
-            .add(MainEventHandler::new())
-            .add(AutoKickEventHandler::new())
-            .add(handle_honeypot_event),
+        event_handlers().add(MainEventHandler::new()),
     )
     .framework(Box::new(framework))
     // .event_handler(features::AuthHandler::new())
@@ -86,7 +83,7 @@ async fn main() -> Result<(), AppError> {
     });
 
     if let Err(why) = client.start().await {
-        error!("Client error: {:?}", why);
+        error!("Client error: {:#?}", why);
     }
 
     Ok(())

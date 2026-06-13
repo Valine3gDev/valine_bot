@@ -3,7 +3,10 @@ use std::{borrow::Cow, time::Duration};
 use itertools::Itertools;
 use serenity::{
     Result,
-    all::{ChannelId, Context, CreateAllowedMentions, CreateMessage, Message},
+    all::{ChannelId, Context, CreateAllowedMentions, CreateMessage, Message, prelude::CacheHttp},
+    builder::{
+        CreateComponent, CreateInteractionResponse, CreateInteractionResponseMessage, CreateModal, CreateModalComponent,
+    },
 };
 use similar::{Algorithm, ChangeTag, TextDiff};
 use tracing::error;
@@ -18,21 +21,36 @@ pub fn create_message<'a>(content: impl Into<Cow<'a, str>>) -> CreateMessage<'a>
     create_safe_message().content(content)
 }
 
-// pub fn create_interaction_message(
-//     content: impl Into<String>,
-//     ephemeral: bool,
-//     components: Option<Vec<CreateActionRow>>,
-// ) -> CreateInteractionResponse {
-//     let mut msg = CreateInteractionResponseMessage::new()
-//         .content(content)
-//         .ephemeral(ephemeral);
+pub fn create_interaction_message<'a>(
+    content: impl Into<Cow<'a, str>>,
+    ephemeral: bool,
+    components: Option<&'a [CreateComponent<'a>]>,
+) -> CreateInteractionResponse<'a> {
+    let mut msg = CreateInteractionResponseMessage::new()
+        .content(content)
+        .ephemeral(ephemeral);
 
-//     if let Some(components) = components {
-//         msg = msg.components(components);
-//     }
+    if let Some(components) = components {
+        msg = msg.components(components);
+    }
 
-//     CreateInteractionResponse::Message(msg)
-// }
+    CreateInteractionResponse::Message(msg)
+}
+
+pub fn create_ephemeral_message<'a>(
+    content: impl Into<Cow<'a, str>>,
+    components: Option<&'a [CreateComponent<'a>]>,
+) -> CreateInteractionResponse<'a> {
+    create_interaction_message(content, true, components)
+}
+
+pub fn create_model<'a>(
+    custom_id: impl Into<Cow<'a, str>>,
+    title: impl Into<Cow<'a, str>>,
+    components: impl Into<Cow<'a, [CreateModalComponent<'a>]>>,
+) -> CreateInteractionResponse<'a> {
+    CreateInteractionResponse::Modal(CreateModal::new(custom_id, title).components(components))
+}
 
 // /**
 // thread_create イベントにおいて、初期メッセージが送信されるか5秒経過するまで待機する
@@ -107,7 +125,7 @@ pub fn format_duration(duration: Duration, mut count: usize) -> String {
         if remaining >= unit && count > 0 {
             let value = remaining / unit;
             if value > 0 {
-                parts.push(format!("{}{}", value, label));
+                parts.push(format!("{value}{label}"));
                 remaining %= unit;
                 count -= 1;
             }
@@ -118,10 +136,10 @@ pub fn format_duration(duration: Duration, mut count: usize) -> String {
 }
 
 pub async fn send_message<'a>(ctx: &Context, channel_id: &ChannelId, builder: CreateMessage<'a>) -> Result<Message> {
-    match channel_id.widen().send_message(&ctx.http, builder).await {
+    match channel_id.widen().send_message(ctx.http(), builder).await {
         Ok(m) => Ok(m),
         Err(why) => {
-            error!("Error sending message: {:?}", why);
+            error!("Error sending message: {:#?}", why);
             Err(why)
         }
     }
@@ -209,9 +227,9 @@ pub fn create_diff_lines_text(old: &str, new: &str) -> String {
     let diff = TextDiff::configure().algorithm(Algorithm::Myers).diff_lines(old, new);
     diff.iter_all_changes()
         .map(|c| match c.tag() {
-            ChangeTag::Delete => format!("- {}", c),
-            ChangeTag::Insert => format!("+ {}", c),
-            ChangeTag::Equal => format!("  {}", c),
+            ChangeTag::Delete => format!("- {c}"),
+            ChangeTag::Insert => format!("+ {c}"),
+            ChangeTag::Equal => format!("  {c}"),
         })
         .join("")
 }

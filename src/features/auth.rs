@@ -1,36 +1,48 @@
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use poise::say_reply;
 use rand::seq::IndexedRandom;
+use serenity::all::prelude::CacheHttp;
 use serenity::all::{
-    ActionRowComponent, ButtonStyle, ComponentInteractionDataKind, Context, CreateActionRow, CreateButton,
-    CreateInputText, CreateInteractionResponse, CreateInteractionResponseFollowup, CreateModal, EmbedMessageBuilding,
-    EventHandler, InputTextStyle, Interaction, Mentionable, MessageBuilder, ModalInteractionCollector, Ready, UserId,
+    ComponentInteractionDataKind, Context, CreateActionRow, CreateButton, CreateInputText,
+    CreateInteractionResponseFollowup, EmbedMessageBuilding, InputTextStyle, Interaction, Mentionable, MessageBuilder,
+    ModalInteractionCollector, UserId,
 };
 use serenity::async_trait;
+use serenity::builder::{CreateComponent, CreateLabel, CreateModalComponent};
+use serenity::model::application::{ButtonStyle, LabelComponent, ModalComponent};
+use serenity::model::event::FullEvent;
+use serenity::small_fixed_array::FixedString;
 use tracing::error;
 
-use crate::config::get_config;
-use crate::utils::{create_interaction_message, create_message, send_message};
-use crate::{PContext, PError};
+use crate::app::{AppContext, AppError, BotDataGetter};
+use crate::core::BotEventHandler;
+use crate::utils::{create_ephemeral_message, create_interaction_message, create_message, create_model, send_message};
 
 static KEYWORD_INPUT_BUTTON: &str = "keyword_input:button";
 static AUTH_COOLDOWN: Duration = Duration::from_secs(60);
 
-pub struct Handler {
+pub struct AuthEventHandler {
     cooldown: Arc<DashMap<UserId, Instant>>,
 }
 
-impl Handler {
+impl AuthEventHandler {
     pub fn new() -> Self {
         Self {
             cooldown: Arc::new(DashMap::new()),
         }
     }
 
+    fn cleanup_cooldown(&self) {
+        self.cooldown.retain(|_, instant| instant.elapsed() < AUTH_COOLDOWN);
+    }
+
     fn remaining_cooldown(&self, user_id: UserId) -> Option<u64> {
+        self.cleanup_cooldown();
+
         if let Some(instant) = self.cooldown.get(&user_id) {
             let remaining = AUTH_COOLDOWN.checked_sub(instant.elapsed())?.as_secs();
             if remaining > 0 {
@@ -43,11 +55,8 @@ impl Handler {
     fn start_cooldown(&self, user_id: UserId) {
         self.cooldown.insert(user_id, Instant::now());
     }
-}
 
-#[async_trait]
-impl EventHandler for Handler {
-    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+    async fn handle_interaction_create(&self, ctx: &Context, interaction: &Interaction) {
         let Interaction::Component(interaction) = interaction else {
             return;
         };
@@ -58,12 +67,12 @@ impl EventHandler for Handler {
             return;
         }
 
-        let config = &get_config(&ctx).await.auth;
+        let config = &ctx.read_app_config().await.auth;
         let member = interaction.member.as_ref().unwrap();
 
         if member.roles.contains(&config.role_id) {
             let _ = interaction
-                .create_response(&ctx, create_interaction_message("既に認証済みです。", true, None))
+                .create_response(ctx.http(), create_ephemeral_message("既に認証済みです。", None))
                 .await;
             return;
         }
@@ -71,10 +80,9 @@ impl EventHandler for Handler {
         if let Some(remaining) = self.remaining_cooldown(interaction.user.id) {
             let _ = interaction
                 .create_response(
-                    &ctx,
-                    create_interaction_message(
-                        format!("クールダウン中です。\n{}秒後に再度お試しください。", remaining),
-                        true,
+                    ctx.http(),
+                    create_ephemeral_message(
+                        format!("クールダウン中です。\n{remaining}秒後に再度お試しください。"),
                         None,
                     ),
                 )
@@ -82,7 +90,7 @@ impl EventHandler for Handler {
             return;
         }
 
-        let mut input_text = CreateInputText::new(InputTextStyle::Short, "合言葉", "keyword")
+        let mut input_text = CreateInputText::new(InputTextStyle::Short, "keyword")
             .required(true)
             .placeholder("合言葉を入力してください。");
 
@@ -90,26 +98,30 @@ impl EventHandler for Handler {
             input_text = input_text.value(value);
         }
 
-        let custom_id = interaction.id.to_string();
+        let custom_id = FixedString::from_str(&interaction.id.to_string()).unwrap();
 
         let _ = interaction
             .create_response(
-                &ctx,
-                CreateInteractionResponse::Modal(
-                    CreateModal::new(&custom_id, "合言葉を入力してください。")
-                        .components([CreateActionRow::InputText(input_text)].to_vec()),
+                ctx.http(),
+                create_model(
+                    &custom_id,
+                    "合言葉を入力してください。",
+                    &[CreateModalComponent::Label(CreateLabel::input_text(
+                        "合言葉",
+                        input_text,
+                    ))],
                 ),
             )
             .await;
 
-        let Some(interaction) = ModalInteractionCollector::new(&ctx.shard)
-            .custom_ids(vec![custom_id])
+        let Some(interaction) = ModalInteractionCollector::new(ctx)
+            .custom_ids([custom_id].to_vec())
             .timeout(Duration::from_secs(60))
             .await
         else {
             let _ = interaction
                 .create_followup(
-                    &ctx,
+                    ctx.http(),
                     CreateInteractionResponseFollowup::new()
                         .content("時間切れです。もう一度お試しください。")
                         .ephemeral(true),
@@ -118,81 +130,81 @@ impl EventHandler for Handler {
             return;
         };
 
-        let keyword = match interaction.data.components.first().unwrap().components.first() {
-            Some(ActionRowComponent::InputText(text)) => text.value.clone().unwrap(),
-            _ => return error!("Invalid modal interaction: {:?}", interaction),
+        let keyword = if let ModalComponent::Label(label) = interaction.data.components.first().unwrap()
+            && let LabelComponent::InputText(text) = label.component.clone()
+        {
+            text.value
+        } else {
+            return error!("Invalid modal interaction: {interaction:#?}");
         };
 
         if !config.trigger_regex.is_match(&keyword) {
             let _ = interaction
-                .create_response(&ctx, create_interaction_message("合言葉が間違っています。", true, None))
+                .create_response(
+                    ctx.http(),
+                    create_interaction_message("合言葉が間違っています。", true, None),
+                )
                 .await;
             self.start_cooldown(interaction.user.id);
             return;
         }
 
-        if let Err(why) = member.add_role(&ctx, config.role_id).await {
+        if let Err(why) = member.add_role(ctx.http(), config.role_id, None).await {
             let log = create_message(format!(
-                "{} にロールを追加できませんでした。\n```\n{}```",
-                member.mention(),
-                why
+                "{} にロールを追加できませんでした。\n```\n{why:#?}```",
+                member.mention()
             ));
-            let _ = send_message(&ctx, &config.log_channel_id, log).await;
-            return error!("Failed to add role: {:?}", why);
+            let _ = send_message(ctx, &config.log_channel_id, log).await;
+            return error!("Failed to add role: {why:#?}");
         }
 
         let log = create_message(
             MessageBuilder::new()
                 .push_named_link_safe(
                     member.display_name(),
-                    format!("<https://discord.com/users/{}>", member.user.id),
+                    &*format!("<https://discord.com/users/{}>", member.user.id),
                 )
                 .push(" (")
-                .push_mono(member.user.id.to_string())
+                .push_mono(&*member.user.id.to_string())
                 .push(") にロールを追加しました。")
                 .build(),
         );
-        let _ = send_message(&ctx, &config.log_channel_id, log).await;
+        let _ = send_message(ctx, &config.log_channel_id, log).await;
 
         const AUTH_SUCCESS_MESSAGE: &str = "合言葉を確認しました。\nチャンネルが表示されない場合、アプリの再起動や再読み込み(Ctrl + R)をお試しください。";
         let _ = interaction
-            .create_response(&ctx, create_interaction_message(AUTH_SUCCESS_MESSAGE, true, None))
+            .create_response(ctx.http(), create_interaction_message(AUTH_SUCCESS_MESSAGE, true, None))
             .await;
     }
+}
 
-    async fn ready(&self, _: Context, _: Ready) {
-        let cooldown = self.cooldown.clone();
-        tokio::spawn(async move {
-            loop {
-                cooldown.retain(|_, instant| instant.elapsed() < AUTH_COOLDOWN);
-                tokio::time::sleep(Duration::from_secs(3600)).await;
-            }
-        });
+#[async_trait]
+impl BotEventHandler for AuthEventHandler {
+    async fn dispatch(&self, ctx: &Context, event: &FullEvent) {
+        if let FullEvent::InteractionCreate { interaction, .. } = event {
+            self.handle_interaction_create(ctx, interaction).await
+        }
     }
 }
 
 /// 合言葉を入力するボタンを作成します。
 #[poise::command(slash_command, ephemeral, guild_only, default_member_permissions = "ADMINISTRATOR")]
 pub async fn create_keyword_button(
-    ctx: PContext<'_>,
+    ctx: AppContext<'_>,
     #[description = "ボタンの表示名"] button: String,
     #[description = "メッセージ内容"] content: String,
-) -> Result<(), PError> {
+) -> Result<(), AppError> {
     say_reply(ctx, "ボタンを作成しました。").await?;
 
     let _ = ctx
         .channel_id()
         .send_message(
-            ctx,
-            create_message(content).components(
-                [CreateActionRow::Buttons(
-                    [CreateButton::new(KEYWORD_INPUT_BUTTON)
-                        .label(button)
-                        .style(ButtonStyle::Primary)]
-                    .to_vec(),
-                )]
-                .to_vec(),
-            ),
+            ctx.http(),
+            create_message(content).components(&[CreateComponent::ActionRow(CreateActionRow::buttons(&[
+                CreateButton::new(KEYWORD_INPUT_BUTTON)
+                    .label(button)
+                    .style(ButtonStyle::Primary),
+            ]))]),
         )
         .await?;
 

@@ -1,5 +1,5 @@
 mod admin;
-// mod auth;
+mod auth;
 mod auto_kick;
 mod honeypot;
 // mod logging;
@@ -9,8 +9,9 @@ mod pin;
 // mod thread_auto_invite;
 
 // pub use auth::Handler as AuthHandler;
-pub use auto_kick::AutoKickEventHandler;
-pub use honeypot::handle_honeypot_event;
+use auth::AuthEventHandler;
+use auto_kick::AutoKickEventHandler;
+use honeypot::handle_honeypot_event;
 // pub use logging::Handler as LoggingHandler;
 // pub use message_cache::Handler as MessageCacheHandler;
 // pub use question::Handler as QuestionHandler;
@@ -20,11 +21,18 @@ pub use honeypot::handle_honeypot_event;
 
 use std::borrow::Cow;
 
-use crate::app::AppCommand;
+use crate::{app::AppCommand, core::BotEventHandlers};
+
+pub fn event_handlers() -> BotEventHandlers {
+    BotEventHandlers::new()
+        .add(handle_honeypot_event)
+        .add(AuthEventHandler::new())
+        .add(AutoKickEventHandler::new())
+}
 
 pub fn commands() -> Vec<AppCommand> {
     build_commands(vec![
-        // auth::create_keyword_button,
+        auth::create_keyword_button,
         // question::question,
         pin::pin,
         admin::reload_config,
