@@ -4,7 +4,7 @@ mod auto_kick;
 mod honeypot;
 // mod logging;
 // mod message_cache;
-// mod pin;
+mod pin;
 // mod question;
 // mod thread_auto_invite;
 
@@ -26,7 +26,7 @@ pub fn commands() -> Vec<AppCommand> {
     build_commands(vec![
         // auth::create_keyword_button,
         // question::question,
-        // pin::pin,
+        pin::pin,
         admin::reload_config,
         // thread_auto_invite::invite_thread,
         // thread_auto_invite::add_invite_role,

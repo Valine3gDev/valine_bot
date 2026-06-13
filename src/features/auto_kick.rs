@@ -126,7 +126,7 @@ impl AutoKickEventHandler {
 #[async_trait]
 impl BotEventHandler for AutoKickEventHandler {
     async fn dispatch(&self, ctx: &Context, event: &FullEvent) {
-        if let FullEvent::CacheReady { guilds, .. } = event {
+        if let FullEvent::CacheReady { .. } = event {
             self.handle_cache_ready(ctx).await;
         }
     }

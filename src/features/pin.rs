@@ -2,28 +2,37 @@ use std::time::Duration;
 
 use futures::StreamExt;
 use poise::say_reply;
-use serenity::all::{GuildChannel, Message, MessageType};
+use serenity::{
+    all::{Message, MessageType},
+    collector::CollectMessages,
+    model::{channel::Channel, id::MessageId},
+};
 
-use crate::config::Config;
-use crate::utils::has_authed_role;
-use crate::{PContext, PError, config::get_config};
+use crate::{
+    app::{AppContext, AppError, BotDataGetter, config::AppConfig},
+    utils::has_authed_role,
+};
 
-async fn check_owner(ctx: PContext<'_>, config: &Config, channel: &GuildChannel) -> bool {
+async fn check_owner(ctx: AppContext<'_>, config: &AppConfig, channel: &Channel) -> bool {
     let author_id = ctx.author().id;
 
-    if channel.owner_id == Some(author_id) {
+    // コンフィグで設定されたオーナーかどうか
+    if config.pin.channels.get(&channel.id().expect_channel()) == Some(&author_id) {
         return true;
     }
 
-    // コンフィグで設定されたオーナーかどうか
-    if config.pin.channels.get(&channel.id) == Some(&author_id) {
+    let Channel::GuildThread(channel) = channel else {
+        return false;
+    };
+
+    if channel.owner_id == author_id {
         return true;
     }
 
     // 質問フォーラムの場合、初期メッセージのメンションからスレッド主を取得
-    // スレッドの初期メッセージのIDはスレッドのIDと同じ
-    if channel.parent_id == Some(config.question.forum_id) {
-        let Ok(msg) = channel.message(ctx, channel.id.get()).await else {
+    if channel.parent_id == config.question.forum_id {
+        // スレッドの初期メッセージのIDはスレッドのIDと同じ
+        let Ok(msg) = channel.id.widen().message(ctx, MessageId::new(channel.id.get())).await else {
             // メッセージが取得できない場合はスレッドオーナーではない判定
             return false;
         };
@@ -47,36 +56,37 @@ async fn check_owner(ctx: PContext<'_>, config: &Config, channel: &GuildChannel)
     check = "has_authed_role"
 )]
 pub async fn pin(
-    ctx: PContext<'_>,
+    ctx: AppContext<'_>,
     #[description = "ピン留めするメッセージ (リンクかID)"] msg: Message,
-) -> Result<(), PError> {
-    let config = get_config(ctx.serenity_context()).await;
-    let channel = ctx.guild_channel().await.unwrap();
+) -> Result<(), AppError> {
+    let config = ctx.read_app_config().await;
+    let channel = ctx.channel().await.unwrap();
 
     if !check_owner(ctx, &config, &channel).await {
         say_reply(ctx, "あなたはこのチャンネルでピン留めできません。").await?;
         return Ok(());
     }
 
-    // ストリームを取得することでイベントの受信を開始させる
     let mut stream = channel
-        .await_reply(&ctx.serenity_context().shard)
+        .id()
+        .collect_messages(&ctx.serenity_context())
         .timeout(Duration::from_secs(5))
         .channel_id(msg.channel_id)
         .author_id(ctx.serenity_context().cache.current_user().id)
         .filter(|r| r.kind == MessageType::PinsAdd)
         .stream();
 
-    if msg.pinned {
-        msg.unpin(ctx).await?;
+    static PIN_REASON: Option<&str> = Some("/pin コマンドによる操作");
+    if msg.pinned() {
+        msg.unpin(&ctx.http(), PIN_REASON).await?;
         say_reply(ctx, "ピン留めを解除しました。").await?;
     } else {
-        msg.pin(ctx).await?;
+        msg.pin(&ctx.http(), PIN_REASON).await?;
         say_reply(ctx, "ピン留めしました。").await?;
     }
 
     if let Some(msg) = stream.next().await {
-        let _ = msg.delete(ctx.http()).await;
+        let _ = msg.delete(&ctx.http(), None).await;
     }
 
     Ok(())
