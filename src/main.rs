@@ -69,7 +69,6 @@ async fn main() -> Result<(), AppError> {
     // .event_handler(features::HoneypotHandler)
     // .event_handler(features::LoggingHandler)
     // .event_handler(features::ThreadAutoInviteHandler::new())
-    // .event_handler(features::ThreadChannelStartupHandler)
     // .event_handler(features::QuestionHandler)
     // .event_handler(features::MessageCacheHandler::new(config.message_cache.disabled))
     .cache_settings(settings)

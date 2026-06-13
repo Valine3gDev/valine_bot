@@ -7,7 +7,6 @@ mod honeypot;
 // mod pin;
 // mod question;
 // mod thread_auto_invite;
-// mod thread_channel_startup;
 
 // pub use auth::Handler as AuthHandler;
 pub use auto_kick::AutoKickEventHandler;
@@ -16,7 +15,6 @@ pub use honeypot::handle_honeypot_event;
 // pub use message_cache::Handler as MessageCacheHandler;
 // pub use question::Handler as QuestionHandler;
 // pub use thread_auto_invite::ThreadAutoInviteHandler;
-// pub use thread_channel_startup::Handler as ThreadChannelStartupHandler;
 
 // pub use message_cache::{MessageCache, MessageCacheType};
 

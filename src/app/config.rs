@@ -22,7 +22,6 @@ pub struct AppConfig {
     pub message_logging: MessageLoggingConfig,
     pub message_cache: MessageCacheConfig,
     pub pin: PinConfig,
-    pub thread_channel_startup: ThreadChannelStartupConfig,
     pub thread_auto_invite: ThreadAutoInviteConfig,
     pub question: QuestionConfig,
 }
@@ -100,17 +99,6 @@ where
         .into_iter()
         .map(|i: Temp| (i.id, i.owner))
         .collect())
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ThreadChannelStartupConfig {
-    pub threads: Vec<ThreadStartupConfig>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ThreadStartupConfig {
-    pub channel_id: ChannelId,
-    pub startup_message: String,
 }
 
 #[derive(Debug, Deserialize)]
