@@ -14,7 +14,7 @@ use tracing::error;
 use crate::{
     app::{AppError, BotData, MainEventHandler, config::AppConfig, on_error},
     core::{BotEventHandlers, create_client},
-    features::{commands, handle_honeypot_event},
+    features::{AutoKickEventHandler, commands, handle_honeypot_event},
 };
 
 #[derive(Clone, Debug, Bpaf)]
@@ -60,6 +60,7 @@ async fn main() -> Result<(), AppError> {
         intents,
         BotEventHandlers::new()
             .add(MainEventHandler::new())
+            .add(AutoKickEventHandler::new())
             .add(handle_honeypot_event),
     )
     .framework(Box::new(framework))

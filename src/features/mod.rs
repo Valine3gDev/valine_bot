@@ -1,6 +1,6 @@
 mod admin;
 // mod auth;
-// mod auto_kick;
+mod auto_kick;
 mod honeypot;
 // mod logging;
 // mod message_cache;
@@ -10,7 +10,7 @@ mod honeypot;
 // mod thread_channel_startup;
 
 // pub use auth::Handler as AuthHandler;
-// pub use auto_kick::Handler as AutoKickHandler;
+pub use auto_kick::AutoKickEventHandler;
 pub use honeypot::handle_honeypot_event;
 // pub use logging::Handler as LoggingHandler;
 // pub use message_cache::Handler as MessageCacheHandler;
