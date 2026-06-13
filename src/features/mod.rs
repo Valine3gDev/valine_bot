@@ -1,6 +1,5 @@
 mod admin;
 mod auth;
-mod auto_kick;
 mod honeypot;
 // mod logging;
 // mod message_cache;
@@ -8,10 +7,6 @@ mod pin;
 // mod question;
 // mod thread_auto_invite;
 
-// pub use auth::Handler as AuthHandler;
-use auth::AuthEventHandler;
-use auto_kick::AutoKickEventHandler;
-use honeypot::handle_honeypot_event;
 // pub use logging::Handler as LoggingHandler;
 // pub use message_cache::Handler as MessageCacheHandler;
 // pub use question::Handler as QuestionHandler;
@@ -21,12 +16,19 @@ use honeypot::handle_honeypot_event;
 
 use std::borrow::Cow;
 
-use crate::{app::AppCommand, core::BotEventHandlers};
+use crate::{
+    app::AppCommand,
+    core::BotEventHandlers,
+    features::{
+        auth::{AutoKickEventHandler, KeywordAuthEventHandler},
+        honeypot::handle_honeypot_event,
+    },
+};
 
 pub fn event_handlers() -> BotEventHandlers {
     BotEventHandlers::new()
         .add(handle_honeypot_event)
-        .add(AuthEventHandler::new())
+        .add(KeywordAuthEventHandler::new())
         .add(AutoKickEventHandler::new())
 }
 

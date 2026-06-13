@@ -1,6 +1,8 @@
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::{
+    str::FromStr,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use dashmap::DashMap;
 use poise::say_reply;
@@ -8,52 +10,54 @@ use rand::seq::IndexedRandom;
 use serenity::all::prelude::CacheHttp;
 use serenity::all::{
     ComponentInteractionDataKind, Context, CreateActionRow, CreateButton, CreateInputText,
-    CreateInteractionResponseFollowup, EmbedMessageBuilding, InputTextStyle, Interaction, Mentionable, MessageBuilder,
-    ModalInteractionCollector, UserId,
+    CreateInteractionResponseFollowup, InputTextStyle, Interaction, Mentionable, ModalInteractionCollector, UserId,
 };
 use serenity::async_trait;
 use serenity::builder::{CreateComponent, CreateLabel, CreateModalComponent};
 use serenity::model::application::{ButtonStyle, LabelComponent, ModalComponent};
+use serenity::model::colour::colours::branding;
 use serenity::model::event::FullEvent;
 use serenity::small_fixed_array::FixedString;
 use tracing::error;
 
 use crate::app::{AppContext, AppError, BotDataGetter};
 use crate::core::BotEventHandler;
+use crate::features::auth::utils::create_auth_log_message;
 use crate::utils::{create_ephemeral_message, create_interaction_message, create_message, create_model, send_message};
 
-static KEYWORD_INPUT_BUTTON: &str = "keyword_input:button";
-static AUTH_COOLDOWN: Duration = Duration::from_secs(60);
+const KEYWORD_INPUT_BUTTON_CUSTOM_ID: &str = "keyword_input:button";
+const FAILED_ATTEMPT_COOLDOWN: Duration = Duration::from_secs(60);
 
-pub struct AuthEventHandler {
-    cooldown: Arc<DashMap<UserId, Instant>>,
+pub struct KeywordAuthEventHandler {
+    cooldown_started_at: Arc<DashMap<UserId, Instant>>,
 }
 
-impl AuthEventHandler {
+impl KeywordAuthEventHandler {
     pub fn new() -> Self {
         Self {
-            cooldown: Arc::new(DashMap::new()),
+            cooldown_started_at: Arc::new(DashMap::new()),
         }
     }
 
-    fn cleanup_cooldown(&self) {
-        self.cooldown.retain(|_, instant| instant.elapsed() < AUTH_COOLDOWN);
+    fn remove_expired_cooldowns(&self) {
+        self.cooldown_started_at
+            .retain(|_, started_at| started_at.elapsed() < FAILED_ATTEMPT_COOLDOWN);
     }
 
-    fn remaining_cooldown(&self, user_id: UserId) -> Option<u64> {
-        self.cleanup_cooldown();
+    fn remaining_cooldown_seconds(&self, user_id: UserId) -> Option<u64> {
+        self.remove_expired_cooldowns();
 
-        if let Some(instant) = self.cooldown.get(&user_id) {
-            let remaining = AUTH_COOLDOWN.checked_sub(instant.elapsed())?.as_secs();
-            if remaining > 0 {
-                return Some(remaining);
+        if let Some(started_at) = self.cooldown_started_at.get(&user_id) {
+            let remaining_seconds = FAILED_ATTEMPT_COOLDOWN.checked_sub(started_at.elapsed())?.as_secs();
+            if remaining_seconds > 0 {
+                return Some(remaining_seconds);
             }
         }
         None
     }
 
-    fn start_cooldown(&self, user_id: UserId) {
-        self.cooldown.insert(user_id, Instant::now());
+    fn start_cooldown_for(&self, user_id: UserId) {
+        self.cooldown_started_at.insert(user_id, Instant::now());
     }
 
     async fn handle_interaction_create(&self, ctx: &Context, interaction: &Interaction) {
@@ -63,7 +67,7 @@ impl AuthEventHandler {
         let ComponentInteractionDataKind::Button = interaction.data.kind else {
             return;
         };
-        if interaction.data.custom_id != KEYWORD_INPUT_BUTTON {
+        if interaction.data.custom_id != KEYWORD_INPUT_BUTTON_CUSTOM_ID {
             return;
         }
 
@@ -77,12 +81,12 @@ impl AuthEventHandler {
             return;
         }
 
-        if let Some(remaining) = self.remaining_cooldown(interaction.user.id) {
+        if let Some(remaining_seconds) = self.remaining_cooldown_seconds(interaction.user.id) {
             let _ = interaction
                 .create_response(
                     ctx.http(),
                     create_ephemeral_message(
-                        format!("クールダウン中です。\n{remaining}秒後に再度お試しください。"),
+                        format!("クールダウン中です。\n{remaining_seconds}秒後に再度お試しください。"),
                         None,
                     ),
                 )
@@ -90,32 +94,32 @@ impl AuthEventHandler {
             return;
         }
 
-        let mut input_text = CreateInputText::new(InputTextStyle::Short, "keyword")
+        let mut keyword_input = CreateInputText::new(InputTextStyle::Short, "keyword")
             .required(true)
             .placeholder("合言葉を入力してください。");
 
         if let Some(value) = config.dummy_keywords.choose(&mut rand::rng()) {
-            input_text = input_text.value(value);
+            keyword_input = keyword_input.value(value);
         }
 
-        let custom_id = FixedString::from_str(&interaction.id.to_string()).unwrap();
+        let modal_custom_id = FixedString::from_str(&interaction.id.to_string()).unwrap();
 
         let _ = interaction
             .create_response(
                 ctx.http(),
                 create_model(
-                    &custom_id,
+                    &modal_custom_id,
                     "合言葉を入力してください。",
                     &[CreateModalComponent::Label(CreateLabel::input_text(
                         "合言葉",
-                        input_text,
+                        keyword_input,
                     ))],
                 ),
             )
             .await;
 
         let Some(interaction) = ModalInteractionCollector::new(ctx)
-            .custom_ids([custom_id].to_vec())
+            .custom_ids([modal_custom_id].to_vec())
             .timeout(Duration::from_secs(60))
             .await
         else {
@@ -130,47 +134,41 @@ impl AuthEventHandler {
             return;
         };
 
-        let keyword = if let ModalComponent::Label(label) = interaction.data.components.first().unwrap()
+        let submitted_keyword = if let ModalComponent::Label(label) = interaction.data.components.first().unwrap()
             && let LabelComponent::InputText(text) = label.component.clone()
         {
             text.value
         } else {
             return error!("Invalid modal interaction: {interaction:#?}");
         };
-        let keyword = keyword.trim();
+        let submitted_keyword = submitted_keyword.trim();
 
-        if config.keyword != keyword {
+        if config.keyword != submitted_keyword {
             let _ = interaction
                 .create_response(
                     ctx.http(),
                     create_interaction_message("合言葉が間違っています。", true, None),
                 )
                 .await;
-            self.start_cooldown(interaction.user.id);
+            self.start_cooldown_for(interaction.user.id);
             return;
         }
 
-        if let Err(why) = member.add_role(ctx.http(), config.role_id, None).await {
+        if let Err(error) = member.add_role(ctx.http(), config.role_id, Some("認証成功")).await {
             let log = create_message(format!(
-                "{} にロールを追加できませんでした。\n```\n{why:#?}```",
+                "{} にロールを追加できませんでした。\n```\n{error:#?}```",
                 member.mention()
             ));
             let _ = send_message(ctx, &config.log_channel_id, log).await;
-            return error!("Failed to add role: {why:#?}");
+            return error!("Failed to add role: {error:#?}");
         }
 
-        let log = create_message(
-            MessageBuilder::new()
-                .push_named_link_safe(
-                    member.display_name(),
-                    &*format!("<https://discord.com/users/{}>", member.user.id),
-                )
-                .push(" (")
-                .push_mono(&*member.user.id.to_string())
-                .push(") にロールを追加しました。")
-                .build(),
-        );
-        let _ = send_message(ctx, &config.log_channel_id, log).await;
+        let _ = send_message(
+            ctx,
+            &config.log_channel_id,
+            create_auth_log_message("認証成功", branding::GREEN, member, None),
+        )
+        .await;
 
         const AUTH_SUCCESS_MESSAGE: &str = "合言葉を確認しました。\nチャンネルが表示されない場合、アプリの再起動や再読み込み(Ctrl + R)をお試しください。";
         let _ = interaction
@@ -180,7 +178,7 @@ impl AuthEventHandler {
 }
 
 #[async_trait]
-impl BotEventHandler for AuthEventHandler {
+impl BotEventHandler for KeywordAuthEventHandler {
     async fn dispatch(&self, ctx: &Context, event: &FullEvent) {
         if let FullEvent::InteractionCreate { interaction, .. } = event {
             self.handle_interaction_create(ctx, interaction).await
@@ -202,7 +200,7 @@ pub async fn create_keyword_button(
         .send_message(
             ctx.http(),
             create_message(content).components(&[CreateComponent::ActionRow(CreateActionRow::buttons(&[
-                CreateButton::new(KEYWORD_INPUT_BUTTON)
+                CreateButton::new(KEYWORD_INPUT_BUTTON_CUSTOM_ID)
                     .label(button)
                     .style(ButtonStyle::Primary),
             ]))]),
