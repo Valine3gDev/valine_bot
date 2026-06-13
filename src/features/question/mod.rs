@@ -42,7 +42,7 @@ impl EventHandler for Handler {
 
         let config = &get_config(&ctx).await.question;
         let Ok(Channel::Guild(channel)) = interaction.channel_id.to_channel(&ctx).await else {
-            return error!("Failed to get channel: {:?}", interaction.channel_id);
+            return error!("Failed to get channel: {:#?}", interaction.channel_id);
         };
         if channel.applied_tags.contains(&config.solved_tag) {
             let _ = interaction

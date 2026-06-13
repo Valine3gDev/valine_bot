@@ -137,7 +137,7 @@ pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Resul
         .edit(
             ctx.into(),
             CreateReply::default()
-                .content(format!("{}\n{}", PROMPT, CONFIRM))
+                .content(format!("{PROMPT}\n{CONFIRM}"))
                 .components(vec![
                     create_select_menu(
                         &custom_ids.select_tag,
@@ -179,7 +179,7 @@ pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Resul
                 CreateMessage::default()
                     .content(msg)
                     .components(vec![CreateActionRow::Buttons(vec![
-                        CreateButton::new(format!("{}:{}", QUESTION_CLOSE_PREFIX, ctx.interaction.user.id))
+                        CreateButton::new(format!("{QUESTION_CLOSE_PREFIX}:{}", ctx.interaction.user.id))
                             .label("質問を解決済みにする")
                             .style(ButtonStyle::Danger),
                     ])]),

@@ -61,9 +61,6 @@ async fn main() -> Result<(), AppError> {
         event_handlers().add(MainEventHandler::new()),
     )
     .framework(Box::new(framework))
-    // .event_handler(features::AuthHandler::new())
-    // .event_handler(features::AutoKickHandler::new())
-    // .event_handler(features::HoneypotHandler)
     // .event_handler(features::LoggingHandler)
     // .event_handler(features::ThreadAutoInviteHandler::new())
     // .event_handler(features::QuestionHandler)

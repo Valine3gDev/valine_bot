@@ -69,7 +69,7 @@ pub async fn pin(
 
     let mut stream = channel
         .id()
-        .collect_messages(&ctx.serenity_context())
+        .collect_messages(ctx.serenity_context())
         .timeout(Duration::from_secs(5))
         .channel_id(msg.channel_id)
         .author_id(ctx.serenity_context().cache.current_user().id)
@@ -78,15 +78,15 @@ pub async fn pin(
 
     static PIN_REASON: Option<&str> = Some("/pin コマンドによる操作");
     if msg.pinned() {
-        msg.unpin(&ctx.http(), PIN_REASON).await?;
+        msg.unpin(ctx.http(), PIN_REASON).await?;
         say_reply(ctx, "ピン留めを解除しました。").await?;
     } else {
-        msg.pin(&ctx.http(), PIN_REASON).await?;
+        msg.pin(ctx.http(), PIN_REASON).await?;
         say_reply(ctx, "ピン留めしました。").await?;
     }
 
     if let Some(msg) = stream.next().await {
-        let _ = msg.delete(&ctx.http(), None).await;
+        let _ = msg.delete(ctx.http(), None).await;
     }
 
     Ok(())

@@ -50,7 +50,7 @@ pub async fn add_invite_role(ctx: ApplicationContext<'_, CommandData, PError>) -
         }
     }
 
-    say_reply(ctx.into(), format!("{} 人に招待用ロールを付与しました。", added_count)).await?;
+    say_reply(ctx.into(), format!("{added_count} 人に招待用ロールを付与しました。")).await?;
     Ok(())
 }
 
@@ -76,7 +76,7 @@ pub async fn remove_invite_role(ctx: ApplicationContext<'_, CommandData, PError>
 
     say_reply(
         ctx.into(),
-        format!("{} 人から招待用ロールを全て削除しました。", role_count),
+        format!("{role_count} 人から招待用ロールを全て削除しました。"),
     )
     .await?;
     Ok(())

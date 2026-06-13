@@ -25,7 +25,7 @@ impl Handler {
             .http
             .get_guild_role_member_counts(guild_id)
             .await
-            .map_err(|e| error!("Failed to get guild role member counts: {}", e))
+            .map_err(|e| error!("Failed to get guild role member counts: {e:#?}"))
             .ok()?;
 
         config.role_ids.iter().find_map(|&role_id| {
@@ -41,9 +41,9 @@ impl Handler {
         };
 
         if let Err(e) = new.add_role(ctx, role).await {
-            error!("Failed to add role {} to member {}: {}", role, new.user.id, e);
+            error!("Failed to add role {role} to member {}: {e:#?}", new.user.id);
         } else {
-            info!("Added role {} to member {}", role, new.user.id);
+            info!("Added role {role} to member {}", new.user.id);
         }
     }
 
@@ -56,9 +56,9 @@ impl Handler {
 
         for role_id in roles {
             if let Err(e) = old.remove_role(&ctx, role_id).await {
-                error!("Failed to remove role {} from member {}: {}", role_id, old.user.id, e);
+                error!("Failed to remove role {role_id} from member {}: {e:#?}", old.user.id);
             } else {
-                info!("Removed role {} from member {}", role_id, old.user.id);
+                info!("Removed role {role_id} from member {}", old.user.id);
                 break;
             }
         }
@@ -70,7 +70,7 @@ pub async fn invite_thread_by_roles(ctx: &Context, thread_id: ChannelId, role_id
         let msg = create_message("スレッド自動招待用メッセージ");
         match thread_id.send_message(&ctx, msg).await {
             Ok(m) => m,
-            Err(why) => return error!("Error sending message: {:?}", why),
+            Err(why) => return error!("Error sending message: {why:#?}"),
         }
     };
 

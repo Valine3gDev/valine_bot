@@ -66,7 +66,7 @@ impl Handler {
         let cache = data.get_mut::<MessageCacheType>().unwrap();
         let len = messages.len();
         cache.extend_messages(messages);
-        info!("Cached {} messages for channel: {} ({})", len, channel.name, channel.id);
+        info!("Cached {len} messages for channel: {} ({})", channel.name, channel.id);
     }
 }
 
@@ -84,19 +84,19 @@ impl EventHandler for Handler {
             let guild = match guild_id.to_guild_cached(ctx_ref) {
                 Some(guild) => guild.clone(),
                 None => {
-                    error!("Failed to get guild: {:?}", guild_id);
+                    error!("Failed to get guild: {:#?}", guild_id);
                     continue;
                 }
             };
 
             let bot_id = ctx_ref.cache.current_user().id;
             let Ok(bot_member) = guild.member(ctx_ref, bot_id).await else {
-                error!("Failed to get bot member for guild: {:?}", guild_id);
+                error!("Failed to get bot member for guild: {:#?}", guild_id);
                 continue;
             };
 
             let Ok(channels) = guild_id.channels(ctx_ref).await else {
-                error!("Failed to get channels for guild: {:?}", guild_id);
+                error!("Failed to get channels for guild: {:#?}", guild_id);
                 continue;
             };
 

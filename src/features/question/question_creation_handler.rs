@@ -23,10 +23,10 @@ pub struct CustomIds {
 impl CustomIds {
     pub fn new(id: u64) -> Self {
         Self {
-            basic: format!("open_basic_question_modal:{}", id),
-            detailed: format!("open_detailed_question_modal:{}", id),
-            select_tag: format!("question_select_tag:{}", id),
-            submit: format!("question_submit:{}", id),
+            basic: format!("open_basic_question_modal:{id}"),
+            detailed: format!("open_detailed_question_modal:{id}"),
+            select_tag: format!("question_select_tag:{id}"),
+            submit: format!("question_submit:{id}"),
         }
     }
 
@@ -72,7 +72,7 @@ impl QuestionCreationHandler {
     async fn send_modal<M: Modal>(&self, interaction: &ComponentInteraction, default: Option<M>, custom_id: &str) {
         let modal = M::create(default, custom_id.to_owned());
         let Ok(_) = interaction.create_response(self.ctx.http(), modal.clone()).await else {
-            error!("Failed to create response: {:?}", modal);
+            error!("Failed to create response: {modal:#?}");
             return;
         };
     }
@@ -81,7 +81,7 @@ impl QuestionCreationHandler {
         match M::parse(data.clone()) {
             Ok(data) => Some(data),
             Err(e) => {
-                error!("Failed to parse modal data: {:?}, {:?}", e, data);
+                error!("Failed to parse modal data: {e:#?}, {data:#?}");
                 None
             }
         }

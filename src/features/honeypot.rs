@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use chrono::Duration;
 use serenity::{
-    all::prelude::Context,
+    all::prelude::{CacheHttp, Context},
     builder::CreateEmbed,
     model::{
         Timestamp,
@@ -83,7 +83,7 @@ fn collect_message_ids(
     message_lookback: Duration,
 ) -> HashMap<ChannelId, Vec<MessageId>> {
     let Some(guild) = guild_id.to_guild_cached(&ctx.cache) else {
-        error!("guild {} not found in cache", guild_id);
+        error!("guild {guild_id} not found in cache");
         return HashMap::new();
     };
 
@@ -116,17 +116,17 @@ async fn delete_messages(ctx: &Context, messages: &HashMap<ChannelId, Vec<Messag
         let channel_id = channel_id.widen();
         if message_ids.len() > 2 {
             for chunk in message_ids.chunks(100) {
-                if let Err(e) = channel_id.delete_messages(&ctx.http, chunk, DELETE_REASON).await {
-                    error!("Failed to delete messages in channel {}: {:?}", channel_id, e);
+                if let Err(e) = channel_id.delete_messages(ctx.http(), chunk, DELETE_REASON).await {
+                    error!("Failed to delete messages in channel {channel_id}: {e:#?}");
                 }
             }
             continue;
         }
 
         if let Some(id) = message_ids.first()
-            && let Err(e) = channel_id.delete_message(&ctx.http, *id, DELETE_REASON).await
+            && let Err(e) = channel_id.delete_message(ctx.http(), *id, DELETE_REASON).await
         {
-            error!("Failed to delete message {} in channel {}: {:?}", id, channel_id, e);
+            error!("Failed to delete message {id} in channel {channel_id}: {e:#?}");
         }
     }
 }
@@ -157,7 +157,7 @@ pub async fn handle_honeypot_event(ctx: &Context, event: &FullEvent) {
         };
 
         let _ = member
-            .kick(&ctx.http, Some("ハニーポットにメッセージを送信したため"))
+            .kick(ctx.http(), Some("ハニーポットにメッセージを送信したため"))
             .await;
 
         let delete_message_ids = collect_message_ids(

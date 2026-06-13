@@ -87,7 +87,7 @@ impl Handler {
 
         for (i, answer) in enumerate(&poll.answers) {
             let answer_text = answer.poll_media.text.clone().unwrap_or("<不明な回答>".to_string());
-            builder.push_safe(format!("- {}", answer_text));
+            builder.push_safe(format!("- {answer_text}"));
             if let Some(results) = &poll.results {
                 builder.push_line_safe(format!(": {}票", results.answer_counts[i].count));
             } else {
@@ -231,7 +231,7 @@ impl EventHandler for Handler {
         _: Option<GuildId>,
     ) {
         let Some(message) = get_cached_message(&ctx, channel_id, deleted_message_id).await else {
-            return error!("Failed to get message: {}", deleted_message_id);
+            return error!("Failed to get message: {deleted_message_id}");
         };
 
         self.create_and_send_log(&ctx, &message, LogType::Delete).await;
@@ -246,7 +246,7 @@ impl EventHandler for Handler {
     ) {
         for message_id in deleted_message_ids {
             let Some(message) = get_cached_message(&ctx, channel_id, message_id).await else {
-                error!("Failed to get message: {}", message_id);
+                error!("Failed to get message: {message_id}");
                 continue;
             };
             self.create_and_send_log(&ctx, &message, LogType::Delete).await;

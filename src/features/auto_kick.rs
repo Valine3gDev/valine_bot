@@ -5,7 +5,10 @@ use std::{
 
 use futures::{StreamExt, stream};
 use serenity::{
-    all::{Context, MessageBuilder, prelude::Mentionable},
+    all::{
+        Context, MessageBuilder,
+        prelude::{CacheHttp, Mentionable},
+    },
     async_trait,
     builder::CreateEmbed,
     model::{Color, event::FullEvent},
@@ -52,7 +55,7 @@ impl AutoKickEventHandler {
                     config
                         .auto_kick
                         .guild_id
-                        .members_iter(&ctx.http)
+                        .members_iter(ctx.http())
                         .filter_map(|r| async { r.ok() })
                         .right_stream()
                 };
@@ -83,10 +86,10 @@ impl AutoKickEventHandler {
                         .await;
 
                     if let Err(e) = member
-                        .kick(&ctx.http, Some("一定期間のうちに認証ロールが付与されていないため"))
+                        .kick(ctx.http(), Some("一定期間のうちに認証ロールが付与されていないため"))
                         .await
                     {
-                        error!("Failed to kick user: {:?}", e);
+                        error!("Failed to kick user: {e:#?}");
                         continue;
                     };
 
