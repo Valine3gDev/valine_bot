@@ -137,8 +137,9 @@ impl AuthEventHandler {
         } else {
             return error!("Invalid modal interaction: {interaction:#?}");
         };
+        let keyword = keyword.trim();
 
-        if !config.trigger_regex.is_match(&keyword) {
+        if config.keyword != keyword {
             let _ = interaction
                 .create_response(
                     ctx.http(),

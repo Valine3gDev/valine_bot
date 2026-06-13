@@ -44,8 +44,7 @@ pub struct BotConfig {
 pub struct AuthConfig {
     pub log_channel_id: ChannelId,
     pub role_id: RoleId,
-    #[serde_as(as = "DisplayFromStr")]
-    pub trigger_regex: Regex,
+    pub keyword: String,
     pub dummy_keywords: Vec<String>,
 }
 
