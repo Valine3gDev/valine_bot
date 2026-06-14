@@ -1,35 +1,37 @@
-use poise::{ApplicationContext, CreateReply};
+use poise::CreateReply;
 use serenity::all::{
-    ButtonStyle, Channel, CreateActionRow, CreateButton, CreateForumPost, CreateMessage, CreateSelectMenu,
-    CreateSelectMenuKind, CreateSelectMenuOption, ForumEmoji, ForumTag, ForumTagId, MessageBuilder, ReactionType,
+    ButtonStyle, CreateActionRow, CreateButton, CreateForumPost, CreateMessage, CreateSelectMenu, CreateSelectMenuKind,
+    CreateSelectMenuOption, ForumEmoji, ForumTag, ForumTagId, MessageBuilder, ReactionType,
 };
+use serenity::builder::CreateComponent;
 use tokio::sync::{RwLock, mpsc};
 use tracing::debug;
 
+use std::borrow::Cow;
+use std::ops::Deref;
 use std::sync::Arc;
 use std::vec;
 
-use crate::config::get_config;
+use crate::app::{AppApplicationContext, AppError, BotDataExt};
 use crate::features::question::QUESTION_CLOSE_PREFIX;
 use crate::features::question::modal::{BasicQuestionData, DetailedQuestionData};
 use crate::features::question::question_creation_handler::{CustomIds, QuestionCreationHandler};
 use crate::utils::has_authed_role;
-use crate::{CommandData, PError};
 
 fn reaction_from_forum_emoji(emoji: &ForumEmoji) -> Option<ReactionType> {
     match emoji.clone() {
         ForumEmoji::Id(emoji) => Some(emoji.into()),
-        ForumEmoji::Name(emoji) => Some(emoji.try_into().unwrap()),
+        ForumEmoji::Name(emoji) => Some(emoji.deref().try_into().unwrap()),
         _ => None,
     }
 }
 
-fn create_select_menu(
-    custom_id: impl Into<String>,
+fn create_select_menu<'a>(
+    custom_id: impl Into<Cow<'a, str>>,
     available_tags: &[ForumTag],
     exclude_tags: &[ForumTagId],
     selected_tags: &[ForumTagId],
-) -> CreateActionRow {
+) -> CreateComponent<'a> {
     let options = available_tags
         .iter()
         .filter(|x| !exclude_tags.contains(&x.id))
@@ -43,17 +45,18 @@ fn create_select_menu(
         })
         .collect::<Vec<_>>();
 
+    let length = options.len();
     let select_menu = CreateSelectMenu::new(
         custom_id,
         CreateSelectMenuKind::String {
-            options: options.clone(),
+            options: options.into(),
         },
     )
     .min_values(1)
-    .max_values(options.len().try_into().unwrap())
+    .max_values(length.try_into().unwrap())
     .placeholder("タグを選択してください");
 
-    CreateActionRow::SelectMenu(select_menu)
+    CreateComponent::ActionRow(CreateActionRow::select_menu(select_menu))
 }
 
 /// Modに関する質問を行うためのフォーラムを作成します。
@@ -66,7 +69,7 @@ fn create_select_menu(
     required_bot_permissions = "CREATE_PUBLIC_THREADS",
     check = "has_authed_role"
 )]
-pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Result<(), PError> {
+pub async fn question(ctx: AppApplicationContext<'_>) -> Result<(), AppError> {
     let custom_ids = Arc::new(CustomIds::new(ctx.id()));
 
     ctx.defer_ephemeral().await?;
@@ -75,12 +78,12 @@ pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Resul
         .label("質問を送信")
         .style(ButtonStyle::Success);
 
-    let config = &get_config(ctx.serenity_context()).await.question;
-    let Ok(Channel::Guild(channel)) = config.forum_id.to_channel(ctx.serenity_context()).await else {
+    let config = &ctx.app_config().await.question;
+    let Ok(channel) = config.forum_id.to_guild_channel(&ctx, ctx.guild_id()).await else {
         return Err("Failed to create forum channel".into());
     };
 
-    let buttons = vec![
+    let buttons = &[
         CreateButton::new(&custom_ids.basic)
             .label("質問の基本情報を入力")
             .style(ButtonStyle::Primary),
@@ -92,14 +95,14 @@ pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Resul
 
     const PROMPT: &str = "ボタンをクリックしてすべての情報を入力してください。\nセレクトボックスからタグを設定してください。\nまた、再度ボタンをクリックすると入力内容を編集することができます。";
     let message = ctx
-        .send(CreateReply::default().content(PROMPT).components(vec![
+        .send(CreateReply::default().content(PROMPT).components(&[
             create_select_menu(
                 &custom_ids.select_tag,
                 &channel.available_tags,
                 &config.exclude_tags,
                 &[],
             ),
-            CreateActionRow::Buttons(buttons.clone()),
+            CreateComponent::ActionRow(CreateActionRow::buttons(&buttons.clone())),
         ]))
         .await?;
 
@@ -137,19 +140,19 @@ pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Resul
         .edit(
             ctx.into(),
             CreateReply::default()
-                .content(format!("{}\n{}", PROMPT, CONFIRM))
-                .components(vec![
+                .content(format!("{PROMPT}\n{CONFIRM}"))
+                .components(&[
                     create_select_menu(
                         &custom_ids.select_tag,
                         &channel.available_tags,
                         &config.exclude_tags,
                         &forum_tag_ids.read().await,
                     ),
-                    CreateActionRow::Buttons({
+                    CreateComponent::ActionRow(CreateActionRow::buttons(&{
                         let mut c = buttons.clone();
                         c[2] = submit_button.clone();
                         c
-                    }),
+                    })),
                 ]),
         )
         .await?;
@@ -165,24 +168,25 @@ pub async fn question(ctx: ApplicationContext<'_, CommandData, PError>) -> Resul
     let forum_tag_ids = forum_tag_ids.read().await;
 
     let msg = MessageBuilder::new()
-        .push_line(basic_data.to_string())
-        .push_line(detailed_data.to_string())
+        .push_line(&*basic_data.to_string())
+        .push_line(&*detailed_data.to_string())
         .push("\n質問者: ")
         .mention(&ctx.interaction.user)
         .build();
 
     let forum_channel = channel
+        .id
         .create_forum_post(
             ctx.http(),
             CreateForumPost::new(
                 &basic_data.title,
                 CreateMessage::default()
                     .content(msg)
-                    .components(vec![CreateActionRow::Buttons(vec![
-                        CreateButton::new(format!("{}:{}", QUESTION_CLOSE_PREFIX, ctx.interaction.user.id))
+                    .components(&[CreateComponent::ActionRow(CreateActionRow::buttons(&[
+                        CreateButton::new(&*format!("{QUESTION_CLOSE_PREFIX}:{}", ctx.interaction.user.id))
                             .label("質問を解決済みにする")
                             .style(ButtonStyle::Danger),
-                    ])]),
+                    ]))]),
             )
             .set_applied_tags(&*forum_tag_ids),
         )

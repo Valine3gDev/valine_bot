@@ -5,108 +5,120 @@ mod question_creation_handler;
 use std::{str::FromStr, time::Duration};
 
 pub use command::question;
+
 use serenity::{
     all::{
-        ButtonStyle, CacheHttp, Channel, ComponentInteractionCollector, ComponentInteractionDataKind, Context,
-        CreateActionRow, CreateButton, EditInteractionResponse, EditThread, EventHandler, Interaction, UserId,
+        ButtonStyle, CacheHttp, ComponentInteractionCollector, ComponentInteractionDataKind, Context, CreateActionRow,
+        CreateButton, EditInteractionResponse, EditThread, Interaction, UserId,
     },
-    async_trait,
+    builder::CreateComponent,
+    model::event::FullEvent,
 };
 use tracing::error;
+use valine_bot_macros::event_handler;
 
-use crate::{config::get_config, utils::create_interaction_message};
+use crate::{app::BotDataExt, utils::create_interaction_message};
 
 pub static QUESTION_CLOSE_PREFIX: &str = "close_question_forum";
 
-pub struct Handler;
+async fn handle_interaction_create(ctx: &Context, interaction: &Interaction) {
+    let Interaction::Component(interaction) = interaction else {
+        return;
+    };
+    let ComponentInteractionDataKind::Button = interaction.data.kind else {
+        return;
+    };
+    let custom_id = &interaction.data.custom_id;
+    if !custom_id.starts_with(QUESTION_CLOSE_PREFIX) {
+        return;
+    }
 
-#[async_trait]
-impl EventHandler for Handler {
-    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        let Interaction::Component(interaction) = interaction else {
-            return;
-        };
-        let ComponentInteractionDataKind::Button = interaction.data.kind else {
-            return;
-        };
-        let custom_id = &interaction.data.custom_id;
-        if !custom_id.starts_with(QUESTION_CLOSE_PREFIX) {
-            return;
-        }
+    let (_, author_id) = custom_id.split_at(QUESTION_CLOSE_PREFIX.len() + 1);
+    let author_id = UserId::from_str(author_id).unwrap();
+    if author_id != interaction.user.id {
+        return;
+    }
 
-        let (_, author_id) = custom_id.split_at(QUESTION_CLOSE_PREFIX.len() + 1);
-        let author_id = UserId::from_str(author_id).unwrap();
-        if author_id != interaction.user.id {
-            return;
-        }
-
-        let config = &get_config(&ctx).await.question;
-        let Ok(Channel::Guild(channel)) = interaction.channel_id.to_channel(&ctx).await else {
-            return error!("Failed to get channel: {:?}", interaction.channel_id);
-        };
-        if channel.applied_tags.contains(&config.solved_tag) {
-            let _ = interaction
-                .create_response(ctx.http(), create_interaction_message("既に解決済みです。", true, None))
-                .await;
-        }
-
-        let confirm_custom_id = format!("close_question_confirm:{}", interaction.id);
-        let cancel_custom_id = format!("close_question_cancel:{}", interaction.id);
-
+    let config = &ctx.app_config().await.question;
+    let Ok(thread) = interaction
+        .channel_id
+        .expect_thread()
+        .to_thread(&ctx, interaction.guild_id)
+        .await
+    else {
+        return error!("Failed to get channel: {:#?}", interaction.channel_id);
+    };
+    if thread.applied_tags.contains(&config.solved_tag) {
         let _ = interaction
-            .create_response(
+            .create_response(ctx.http(), create_interaction_message("既に解決済みです。", true, None))
+            .await;
+    }
+
+    let confirm_custom_id = format!("close_question_confirm:{}", interaction.id);
+    let cancel_custom_id = format!("close_question_cancel:{}", interaction.id);
+
+    let _ = interaction
+        .create_response(
+            ctx.http(),
+            create_interaction_message(
+                "本当に質問を終了しますか？",
+                true,
+                Some(&[CreateComponent::ActionRow(CreateActionRow::buttons(&[
+                    CreateButton::new(&confirm_custom_id)
+                        .label("はい")
+                        .emoji('✅')
+                        .style(ButtonStyle::Danger),
+                    CreateButton::new(&cancel_custom_id)
+                        .label("いいえ")
+                        .emoji('❎')
+                        .style(ButtonStyle::Success),
+                ]))]),
+            ),
+        )
+        .await;
+
+    let res = ComponentInteractionCollector::new(ctx)
+        .custom_ids(
+            [confirm_custom_id.clone(), cancel_custom_id]
+                .map(|id| id.try_into().unwrap())
+                .into(),
+        )
+        .timeout(Duration::from_secs(60))
+        .await;
+
+    let (confirmed, text) = match res {
+        Some(i) if i.data.custom_id == confirm_custom_id => (true, "質問を解決済みにしました。"),
+        _ => (false, "キャンセルしました。"),
+    };
+
+    if confirmed {
+        let mut applied_tags = thread.applied_tags.to_vec();
+        applied_tags.push(config.solved_tag);
+
+        interaction
+            .channel_id
+            .expect_thread()
+            .edit(
                 ctx.http(),
-                create_interaction_message(
-                    "本当に質問を終了しますか？",
-                    true,
-                    Some(vec![CreateActionRow::Buttons(
-                        [
-                            CreateButton::new(&confirm_custom_id)
-                                .label("はい")
-                                .emoji('✅')
-                                .style(ButtonStyle::Danger),
-                            CreateButton::new(&cancel_custom_id)
-                                .label("いいえ")
-                                .emoji('❎')
-                                .style(ButtonStyle::Success),
-                        ]
-                        .to_vec(),
-                    )]),
-                ),
+                EditThread::new()
+                    .name(format!("{}{}", config.solved_name_prefix, thread.base.name))
+                    .applied_tags(applied_tags),
             )
-            .await;
+            .await
+            .unwrap();
+    }
 
-        let res = ComponentInteractionCollector::new(&ctx.shard)
-            .custom_ids(vec![confirm_custom_id.clone(), cancel_custom_id.clone()])
-            .timeout(Duration::from_secs(60))
-            .await;
+    let _ = interaction
+        .edit_response(
+            ctx.http(),
+            EditInteractionResponse::new().content(text).components(vec![]),
+        )
+        .await;
+}
 
-        let (confirmed, text) = match res {
-            Some(i) if i.data.custom_id == confirm_custom_id => (true, "質問を解決済みにしました。"),
-            _ => (false, "キャンセルしました。"),
-        };
-
-        if confirmed {
-            let mut applied_tags = channel.applied_tags.clone();
-            applied_tags.push(config.solved_tag);
-
-            interaction
-                .channel_id
-                .edit_thread(
-                    ctx.http(),
-                    EditThread::new()
-                        .name(format!("{}{}", config.solved_name_prefix, channel.name))
-                        .applied_tags(applied_tags),
-                )
-                .await
-                .unwrap();
-        }
-
-        let _ = interaction
-            .edit_response(
-                ctx.http(),
-                EditInteractionResponse::new().content(text).components(vec![]),
-            )
-            .await;
+#[event_handler]
+pub async fn handle_question_event(ctx: &Context, event: &FullEvent) {
+    if let FullEvent::InteractionCreate { interaction, .. } = event {
+        handle_interaction_create(ctx, interaction).await;
     }
 }

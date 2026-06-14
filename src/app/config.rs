@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
+    path::Path,
 };
 
 use chrono::Duration;
@@ -8,19 +8,13 @@ use duration_str::deserialize_duration_chrono;
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
 use serde_with::{DisplayFromStr, serde_as};
-use serenity::{
-    all::{ChannelId, Context, ForumTagId, GuildId, RoleId, UserId},
-    prelude::TypeMapKey,
-};
+use serenity::all::{ChannelId, ForumTagId, GuildId, RoleId, Token, UserId};
+use tokio::fs::read_to_string;
 
-pub async fn get_config(ctx: &Context) -> Arc<Config> {
-    let data = ctx.data.read().await;
-    let config = data.get::<Config>().expect("Expected MessageCount in TypeMap.");
-    config.clone()
-}
+use crate::app::AppError;
 
 #[derive(Debug, Deserialize)]
-pub struct Config {
+pub struct AppConfig {
     pub bot: BotConfig,
     pub auth: AuthConfig,
     pub auto_kick: AutoKickConfig,
@@ -28,18 +22,20 @@ pub struct Config {
     pub message_logging: MessageLoggingConfig,
     pub message_cache: MessageCacheConfig,
     pub pin: PinConfig,
-    pub thread_channel_startup: ThreadChannelStartupConfig,
     pub thread_auto_invite: ThreadAutoInviteConfig,
     pub question: QuestionConfig,
 }
 
-impl TypeMapKey for Config {
-    type Value = Arc<Config>;
+impl AppConfig {
+    pub async fn from_file(path: &str) -> Result<Self, AppError> {
+        let text = read_to_string(path).await?;
+        Ok(toml::from_str(&text)?)
+    }
 }
 
 #[derive(Debug, Deserialize)]
 pub struct BotConfig {
-    pub token: String,
+    pub token: Token,
     pub owners: HashSet<UserId>,
 }
 
@@ -48,8 +44,7 @@ pub struct BotConfig {
 pub struct AuthConfig {
     pub log_channel_id: ChannelId,
     pub role_id: RoleId,
-    #[serde_as(as = "DisplayFromStr")]
-    pub trigger_regex: Regex,
+    pub keyword: String,
     pub dummy_keywords: Vec<String>,
 }
 
@@ -78,9 +73,7 @@ pub struct MessageLoggingConfig {
 #[derive(Debug, Deserialize)]
 pub struct MessageCacheConfig {
     pub disabled: bool,
-    pub limit: usize,
     pub target_guild_ids: Vec<GuildId>,
-    pub ignore_channel_ids: Vec<ChannelId>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -103,17 +96,6 @@ where
         .into_iter()
         .map(|i: Temp| (i.id, i.owner))
         .collect())
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ThreadChannelStartupConfig {
-    pub threads: Vec<ThreadStartupConfig>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ThreadStartupConfig {
-    pub channel_id: ChannelId,
-    pub startup_message: String,
 }
 
 #[derive(Debug, Deserialize)]

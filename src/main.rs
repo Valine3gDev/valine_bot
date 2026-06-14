@@ -1,89 +1,21 @@
-mod config;
-mod error;
+mod app;
+mod core;
 mod extensions;
 mod features;
 mod utils;
 
-use std::{fs::read_to_string, sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use bpaf::Bpaf;
-use config::Config;
-use error::on_error;
-use features::{MessageCache, MessageCacheType, commands};
-use poise::{Framework, FrameworkOptions};
-use serenity::{
-    all::{ActivityData, ChunkGuildFilter, Guild, GuildId, RatelimitInfo, Ready},
-    async_trait,
-    cache::Settings as CacheSettings,
-    prelude::*,
+use poise::{Framework, FrameworkOptions, PrefixFrameworkOptions};
+use serenity::{cache::Settings as CacheSettings, prelude::*};
+use tracing::error;
+
+use crate::{
+    app::{AppError, BotData, MainEventHandler, config::AppConfig, on_error},
+    core::create_client,
+    features::{commands, event_handlers},
 };
-use sysinfo::{Pid, System};
-use tokio::task::JoinHandle;
-use tracing::{error, info, warn};
-
-pub type PError = Box<dyn std::error::Error + Send + Sync>;
-pub struct CommandData {}
-pub type PContext<'a> = poise::Context<'a, CommandData, PError>;
-pub type PCommand = poise::Command<CommandData, PError>;
-
-struct MainHandler {
-    activity_task: Mutex<Option<JoinHandle<()>>>,
-}
-
-impl MainHandler {
-    pub fn new() -> Self {
-        Self {
-            activity_task: Mutex::new(None),
-        }
-    }
-}
-
-#[async_trait]
-impl EventHandler for MainHandler {
-    async fn ready(&self, _: Context, ready: Ready) {
-        info!("{} is connected!", ready.user.name);
-    }
-
-    async fn cache_ready(&self, ctx: Context, _: Vec<GuildId>) {
-        let mut task = self.activity_task.lock().await;
-
-        if let Some(handle) = task.take() {
-            handle.abort();
-        }
-
-        *task = Some(tokio::spawn(async move {
-            let mut system = System::new_all();
-            let pid = Pid::from_u32(std::process::id());
-
-            loop {
-                system.refresh_all();
-
-                if let Some(memory) = system.process(pid).map(|p| p.memory() as f64 / 1024.0 / 1024.0) {
-                    ctx.set_activity(Some(ActivityData::custom(format!("メモリ使用量: {:.1}MB", memory))));
-                } else {
-                    error!("Failed to get process info");
-                }
-
-                tokio::time::sleep(Duration::from_secs(60)).await;
-            }
-        }));
-    }
-
-    async fn guild_create(&self, ctx: Context, guild: Guild, _: Option<bool>) {
-        // 全てのメンバーを取得する。結果は Serenity によって自動でキャッシュされる。
-        ctx.shard
-            .chunk_guild(guild.id, Some(0), false, ChunkGuildFilter::None, None);
-    }
-
-    async fn ratelimit(&self, data: RatelimitInfo) {
-        warn!(
-            "Ratelimited {} {}: {}s",
-            data.method.reqwest_method(),
-            data.path,
-            data.timeout.as_secs()
-        );
-    }
-}
 
 #[derive(Clone, Debug, Bpaf)]
 #[bpaf(options, version)]
@@ -93,32 +25,30 @@ struct Options {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), AppError> {
     tracing_subscriber::fmt::init();
 
-    let config = read_to_string("config.toml").expect("Failed to read config.toml");
-    let config = toml::from_str::<Config>(&config).unwrap_or_else(|e| panic!("Failed to parse config.toml: {}", e));
+    let config = AppConfig::from_file("config.toml").await?;
 
     let options = options().run();
 
     if options.check_config {
         println!("Config is valid");
-        return;
+        return Ok(());
     }
 
     let framework = Framework::builder()
         .options(FrameworkOptions {
+            prefix_options: PrefixFrameworkOptions {
+                prefix: None,
+                mention_as_prefix: false,
+                ..Default::default()
+            },
             commands: commands(),
             on_error: |error| Box::pin(on_error(error)),
             skip_checks_for_owners: false,
             owners: config.bot.owners.clone(),
             ..Default::default()
-        })
-        .setup(move |ctx, _ready, framework| {
-            Box::pin(async move {
-                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                Ok(CommandData {})
-            })
         })
         .build();
 
@@ -128,34 +58,30 @@ async fn main() {
         | GatewayIntents::MESSAGE_CONTENT;
 
     let mut settings = CacheSettings::default();
-    settings.max_messages = 1_000_000;
+    settings.max_messages = usize::MAX;
 
-    let mut client = Client::builder(&config.bot.token, intents)
-        .framework(framework)
-        .event_handler(MainHandler::new())
-        .event_handler(features::AuthHandler::new())
-        .event_handler(features::AutoKickHandler::new())
-        .event_handler(features::HoneypotHandler)
-        .event_handler(features::LoggingHandler)
-        .event_handler(features::ThreadAutoInviteHandler::new())
-        .event_handler(features::ThreadChannelStartupHandler)
-        .event_handler(features::QuestionHandler)
-        .event_handler(features::MessageCacheHandler::new(config.message_cache.disabled))
-        .cache_settings(settings)
-        .type_map_insert::<MessageCacheType>(Arc::new(MessageCache::new()))
-        .type_map_insert::<Config>(Arc::new(config))
-        .await
-        .expect("Err creating client");
+    let mut client = create_client(
+        config.bot.token.clone(),
+        intents,
+        event_handlers(&config).add(MainEventHandler::new()),
+    )
+    .framework(Box::new(framework))
+    .cache_settings(settings)
+    .data(Arc::new(BotData::new(config)))
+    .await
+    .expect("Err creating client");
 
-    let shard_manager = client.shard_manager.clone();
+    let shutdown = client.shard_manager.get_shutdown_trigger();
     tokio::spawn(async move {
         tokio::signal::ctrl_c()
             .await
             .expect("Could not register ctrl+c handler");
-        shard_manager.shutdown_all().await;
+        shutdown()
     });
 
     if let Err(why) = client.start().await {
-        error!("Client error: {:?}", why);
+        error!("Client error: {:#?}", why);
     }
+
+    Ok(())
 }
