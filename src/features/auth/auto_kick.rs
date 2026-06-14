@@ -3,20 +3,19 @@ use std::{
     time::Duration,
 };
 
-use futures::{StreamExt, stream};
+use futures::StreamExt;
 use serenity::{
     all::{Context, prelude::CacheHttp},
     async_trait,
     model::{Color, event::FullEvent},
 };
-use tokio::pin;
 use tracing::error;
 
 use crate::{
     app::BotDataExt,
     core::BotEventHandler,
     features::auth::utils::create_auth_log_message,
-    utils::{create_message, send_message},
+    utils::{create_message, send_message, stream_members},
 };
 
 pub struct AutoKickEventHandler {
@@ -34,24 +33,7 @@ impl AutoKickEventHandler {
         loop {
             let config = ctx.app_config().await;
 
-            let cached_members = ctx
-                .cache
-                .guild(config.auto_kick.guild_id)
-                // メンバーキャッシュが構築されていない場合は API から取ってくるため
-                .filter(|guild| guild.members.len() as u32 >= guild.member_count.get())
-                .map(|guild| guild.members.clone());
-            let member_stream = if let Some(members) = cached_members {
-                stream::iter(members).left_stream()
-            } else {
-                config
-                    .auto_kick
-                    .guild_id
-                    .members_iter(ctx.http())
-                    .filter_map(|r| async { r.ok() })
-                    .right_stream()
-            };
-            pin!(member_stream);
-
+            let mut member_stream = stream_members(&ctx, config.auto_kick.guild_id);
             while let Some(member) = member_stream.next().await {
                 if member.user.bot() {
                     continue;

@@ -1,7 +1,10 @@
 use std::{borrow::Cow, time::Duration};
 
 use async_stream::stream;
-use futures::Stream;
+use futures::{
+    Stream, StreamExt,
+    stream::{self, BoxStream},
+};
 use itertools::Itertools;
 use serenity::{
     Result,
@@ -172,10 +175,20 @@ pub fn create_diff_lines_text(old: &str, new: &str) -> String {
         .join("")
 }
 
-pub fn get_guild_members(ctx: &Context, guild_id: GuildId) -> impl Iterator<Item = Member> {
-    guild_id
+pub fn stream_members(ctx: &Context, guild_id: GuildId) -> BoxStream<'_, Member> {
+    let cached_members = guild_id
         .to_guild_cached(&ctx.cache)
-        .map(|guild| guild.members.clone())
-        .into_iter()
-        .flatten()
+        .filter(|guild| guild.members.len() as u32 >= guild.member_count.get())
+        .map(|guild| guild.members.clone());
+
+    let stream = if let Some(members) = cached_members {
+        stream::iter(members).left_stream()
+    } else {
+        guild_id
+            .members_iter(ctx.http())
+            .filter_map(|result| async { result.ok() })
+            .right_stream()
+    };
+
+    stream.boxed()
 }

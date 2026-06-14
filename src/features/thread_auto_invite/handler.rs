@@ -25,7 +25,7 @@ async fn find_role(ctx: &Context, guild_id: GuildId, config: &ThreadAutoInviteCo
     })
 }
 
-pub(in crate::features::thread_auto_invite) async fn handle_role_assignment(
+pub(in crate::features::thread_auto_invite) async fn assign_role(
     ctx: &Context,
     new: &Member,
     config: &ThreadAutoInviteConfig,
@@ -42,7 +42,7 @@ pub(in crate::features::thread_auto_invite) async fn handle_role_assignment(
     }
 }
 
-pub(in crate::features::thread_auto_invite) async fn handle_role_removal(
+pub(in crate::features::thread_auto_invite) async fn remove_role(
     ctx: &Context,
     old: &Member,
     config: &ThreadAutoInviteConfig,
@@ -111,9 +111,9 @@ async fn handle_guild_member_update(ctx: &Context, old: &Option<Member>, new: &O
     let has_old_role = old.roles.contains(&config.display_role_id);
 
     if has_new_role && !has_old_role {
-        handle_role_assignment(ctx, new, config).await;
+        assign_role(ctx, new, config).await;
     } else if has_old_role && !has_new_role {
-        handle_role_removal(ctx, old, config).await;
+        remove_role(ctx, old, config).await;
     }
 }
 
