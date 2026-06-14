@@ -101,7 +101,7 @@ pub async fn question(ctx: AppApplicationContext<'_>) -> Result<(), AppError> {
             create_select_menu(
                 &custom_ids.select_tag,
                 &channel.available_tags,
-                &config.exclude_tags,
+                &[config.solved_tag],
                 &[],
             ),
             CreateComponent::ActionRow(CreateActionRow::buttons(&buttons.clone())),
@@ -148,7 +148,7 @@ pub async fn question(ctx: AppApplicationContext<'_>) -> Result<(), AppError> {
                     create_select_menu(
                         &custom_ids.select_tag,
                         &channel.available_tags,
-                        &config.exclude_tags,
+                        &[config.solved_tag],
                         &forum_tag_ids.read().await,
                     ),
                     CreateComponent::ActionRow(CreateActionRow::buttons(&{
