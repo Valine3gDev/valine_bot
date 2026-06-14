@@ -1,5 +1,7 @@
 use std::{borrow::Cow, time::Duration};
 
+use async_stream::stream;
+use futures::Stream;
 use itertools::Itertools;
 use serenity::{
     Result,
@@ -7,6 +9,7 @@ use serenity::{
     builder::{
         CreateComponent, CreateInteractionResponse, CreateInteractionResponseMessage, CreateModal, CreateModalComponent,
     },
+    model::channel::GuildThread,
 };
 use similar::{Algorithm, ChangeTag, TextDiff};
 use tracing::error;
@@ -145,83 +148,45 @@ pub async fn send_message<'a>(ctx: &Context, channel_id: &ChannelId, builder: Cr
     }
 }
 
-// pub async fn get_cached_message(ctx: &Context, channel_id: ChannelId, message_id: MessageId) -> Option<Message> {
-//     if let Some(m) = ctx.cache.message(channel_id, message_id) {
-//         return Some(m.clone());
-//     }
+/**
+指定されたチャンネルのアーカイブされたパブリックスレッドをすべて取得します。
+ */
+pub async fn fetch_all_archived_public_thread(
+    ctx: &Context,
+    channel_id: ChannelId,
+    max_retries: Option<usize>,
+) -> impl Stream<Item = GuildThread> {
+    let max_retries = max_retries.unwrap_or(5);
+    Box::pin(stream! {
+        let mut retries_left = max_retries;
+        let mut before = None;
+        loop {
+            let thread_data = match ctx.http.get_channel_archived_public_threads(channel_id, before, Some(100)).await {
+                Ok(data) => data,
+                Err(_) => {
+                    if retries_left == 0 {
+                        break;
+                    } else {
+                        retries_left -= 1;
+                        continue;
+                    }
+                }
+            };
 
-//     let data = ctx.data.read().await;
-//     let cache = data.get::<MessageCacheType>().unwrap();
-//     if let Some(m) = cache.get(channel_id, message_id) {
-//         return Some(m);
-//     }
+            before = thread_data.threads
+                .last()
+                .and_then(|last| last.thread_metadata.archive_timestamp);
 
-//     None
-// }
+            for channel in thread_data.threads {
+                yield channel;
+            }
 
-// /**
-// 指定されたチャンネルのアーカイブされたパブリックスレッドを取得します。
-// - `ChannelId::get_archived_public_threads`は Discord の要求に従っていないので、自前で実装しています。
-//   - Serenity の next ブランチで修正済み
-// */
-// pub async fn fetch_channel_archived_public_threads(
-//     http: impl AsRef<Http>,
-//     channel_id: ChannelId,
-//     before: Option<Timestamp>,
-//     limit: Option<u64>,
-// ) -> Result<ThreadsData> {
-//     let mut params = vec![];
-//     if let Some(before) = before {
-//         params.push(("before", before.to_string()));
-//     }
-//     if let Some(limit) = limit {
-//         params.push(("limit", limit.to_string()));
-//     }
-
-//     http.as_ref()
-//         .fire(Request::new(Route::ChannelArchivedPublicThreads { channel_id }, LightMethod::Get).params(Some(params)))
-//         .await
-// }
-
-// /**
-// 指定されたチャンネルのアーカイブされたパブリックスレッドをすべて取得します。
-//  */
-// pub async fn fetch_all_archived_public_thread(
-//     ctx: &Context,
-//     channel_id: ChannelId,
-//     max_retries: Option<usize>,
-// ) -> impl Stream<Item = GuildChannel> + '_ {
-//     let max_retries = max_retries.unwrap_or(5);
-//     Box::pin(stream! {
-//         let mut retries_left = max_retries;
-//         let mut before = None;
-//         loop {
-//             let thread_data = match fetch_channel_archived_public_threads(&ctx, channel_id, before, Some(100)).await {
-//                 Ok(data) => data,
-//                 Err(_) => {
-//                     if retries_left == 0 {
-//                         break;
-//                     } else {
-//                         retries_left -= 1;
-//                         continue;
-//                     }
-//                 }
-//             };
-
-//             before = thread_data.threads
-//                 .last()
-//                 .and_then(|last| last.thread_metadata.unwrap().archive_timestamp);
-
-//             for channel in thread_data.threads {
-//                 yield channel;
-//             }
-
-//             if !thread_data.has_more || before.is_none() {
-//                 break;
-//             }
-//         }
-//     })
-// }
+            if !thread_data.has_more || before.is_none() {
+                break;
+            }
+        }
+    })
+}
 
 pub fn create_diff_lines_text(old: &str, new: &str) -> String {
     let diff = TextDiff::configure().algorithm(Algorithm::Myers).diff_lines(old, new);

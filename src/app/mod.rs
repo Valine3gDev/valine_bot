@@ -5,6 +5,7 @@ mod data;
 mod error;
 mod event_handler;
 pub mod types;
+pub mod utils;
 
 pub use data::{BotData, BotDataGetter};
 pub use error::{BotError, on_error};

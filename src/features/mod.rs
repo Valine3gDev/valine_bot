@@ -1,35 +1,32 @@
 mod admin;
 mod auth;
 mod honeypot;
-// mod logging;
-// mod message_cache;
+mod message_cache_handler;
+mod message_logging;
 mod pin;
 // mod question;
 // mod thread_auto_invite;
 
-// pub use logging::Handler as LoggingHandler;
-// pub use message_cache::Handler as MessageCacheHandler;
-// pub use question::Handler as QuestionHandler;
-// pub use thread_auto_invite::ThreadAutoInviteHandler;
-
-// pub use message_cache::{MessageCache, MessageCacheType};
-
 use std::borrow::Cow;
 
 use crate::{
-    app::AppCommand,
+    app::{AppCommand, config::AppConfig},
     core::BotEventHandlers,
     features::{
         auth::{AutoKickEventHandler, KeywordAuthEventHandler},
         honeypot::handle_honeypot_event,
+        message_cache_handler::MessageCacheHandler,
+        message_logging::handle_message_logging_event,
     },
 };
 
-pub fn event_handlers() -> BotEventHandlers {
+pub fn event_handlers(config: &AppConfig) -> BotEventHandlers {
     BotEventHandlers::new()
         .add(handle_honeypot_event)
+        .add(handle_message_logging_event)
         .add(KeywordAuthEventHandler::new())
         .add(AutoKickEventHandler::new())
+        .add(MessageCacheHandler::new(config.message_cache.disabled))
 }
 
 pub fn commands() -> Vec<AppCommand> {

@@ -58,7 +58,7 @@ async fn main() -> Result<(), AppError> {
     let mut client = create_client(
         config.bot.token.clone(),
         intents,
-        event_handlers().add(MainEventHandler::new()),
+        event_handlers(&config).add(MainEventHandler::new()),
     )
     .framework(Box::new(framework))
     // .event_handler(features::LoggingHandler)

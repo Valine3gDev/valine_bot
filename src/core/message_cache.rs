@@ -1,14 +1,14 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use dashmap::DashMap;
 use itertools::Itertools;
 use serenity::{
-    all::{ChannelId, Message, MessageId},
-    prelude::TypeMapKey,
+    all::{Message, MessageId},
+    model::id::GenericChannelId,
 };
 
 pub struct MessageCache {
-    cache: DashMap<ChannelId, HashMap<MessageId, Message>>,
+    cache: DashMap<GenericChannelId, HashMap<MessageId, Message>>,
 }
 
 impl MessageCache {
@@ -17,11 +17,23 @@ impl MessageCache {
     }
 
     pub fn insert(&self, message: Message) {
-        let mut map = self.cache.entry(message.channel_id).or_insert(HashMap::new());
+        let mut map = self.cache.entry(message.channel_id).or_default();
         map.insert(message.id, message);
     }
 
-    pub fn extend(&self, iter: impl IntoIterator<Item = (ChannelId, MessageId, Message)>) {
+    pub fn remove(&self, channel_id: GenericChannelId, message_id: MessageId) {
+        let mut map = self.cache.entry(channel_id).or_default();
+        map.remove(&message_id);
+    }
+
+    pub fn remove_all(&self, channel_id: GenericChannelId, message_ids: &[MessageId]) {
+        let mut map = self.cache.entry(channel_id).or_default();
+        for id in message_ids {
+            map.remove(id);
+        }
+    }
+
+    pub fn extend(&self, iter: impl IntoIterator<Item = (GenericChannelId, MessageId, Message)>) {
         iter.into_iter()
             .into_group_map_by(|(channel_id, _, _)| *channel_id)
             .into_iter()
@@ -35,7 +47,7 @@ impl MessageCache {
                 )
             })
             .for_each(|(channel_id, messages)| {
-                let mut map = self.cache.entry(channel_id).or_insert(HashMap::new());
+                let mut map = self.cache.entry(channel_id).or_default();
                 map.extend(messages);
             });
     }
@@ -47,7 +59,7 @@ impl MessageCache {
         );
     }
 
-    pub fn get(&self, channel_id: ChannelId, message_id: MessageId) -> Option<Message> {
+    pub fn get(&self, channel_id: GenericChannelId, message_id: MessageId) -> Option<Message> {
         let map = self.cache.get(&channel_id)?;
         map.get(&message_id).cloned()
     }
@@ -57,10 +69,4 @@ impl Default for MessageCache {
     fn default() -> Self {
         Self::new()
     }
-}
-
-pub struct MessageCacheType;
-
-impl TypeMapKey for MessageCacheType {
-    type Value = Arc<MessageCache>;
 }
