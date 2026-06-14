@@ -77,7 +77,7 @@ async fn handle_interaction_create(ctx: &Context, interaction: &Interaction) {
         )
         .await;
 
-    let res = ComponentInteractionCollector::new(&ctx)
+    let res = ComponentInteractionCollector::new(ctx)
         .custom_ids(
             [confirm_custom_id.clone(), cancel_custom_id]
                 .map(|id| id.try_into().unwrap())
