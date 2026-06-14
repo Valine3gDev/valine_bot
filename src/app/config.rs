@@ -110,4 +110,5 @@ pub struct QuestionConfig {
     pub forum_id: ChannelId,
     pub exclude_tags: Vec<ForumTagId>,
     pub solved_tag: ForumTagId,
+    pub solved_name_prefix: String,
 }

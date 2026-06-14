@@ -3,4 +3,4 @@
 /THIRD_PARTY_LICENSES*
 
 .env
-config.toml
+config.toml*
