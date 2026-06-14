@@ -17,7 +17,7 @@ use serenity::{
 use tracing::error;
 use valine_bot_macros::event_handler;
 
-use crate::{app::BotDataGetter, utils::create_interaction_message};
+use crate::{app::BotDataExt, utils::create_interaction_message};
 
 pub static QUESTION_CLOSE_PREFIX: &str = "close_question_forum";
 
@@ -39,7 +39,7 @@ async fn handle_interaction_create(ctx: &Context, interaction: &Interaction) {
         return;
     }
 
-    let config = &ctx.read_app_config().await.question;
+    let config = &ctx.app_config().await.question;
     let Ok(thread) = interaction
         .channel_id
         .expect_thread()

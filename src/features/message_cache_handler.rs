@@ -15,7 +15,7 @@ use serenity::{
 };
 use tracing::{error, info};
 
-use crate::{app::BotDataGetter, core::BotEventHandler, utils::fetch_all_archived_public_thread};
+use crate::{app::BotDataExt, core::BotEventHandler, utils::fetch_all_archived_public_thread};
 
 enum ChannelWrapper {
     Channel(GuildChannel),
@@ -104,7 +104,7 @@ impl MessageCacheHandler {
             return;
         }
 
-        let config = ctx.read_app_config().await;
+        let config = ctx.app_config().await;
 
         for guild_id in &config.message_cache.target_guild_ids {
             let guild = match guild_id.to_guild_cached(&ctx.cache) {

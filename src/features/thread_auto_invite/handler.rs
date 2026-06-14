@@ -7,7 +7,7 @@ use tracing::{error, info};
 use valine_bot_macros::event_handler;
 
 use crate::{
-    app::{BotDataGetter, config::ThreadAutoInviteConfig},
+    app::{BotDataExt, config::ThreadAutoInviteConfig},
     utils::{await_initial_message, create_message},
 };
 
@@ -97,7 +97,7 @@ async fn handle_thread_create(ctx: &Context, thread: &GuildThread, newly_created
         return;
     }
 
-    let config = &ctx.read_app_config().await.thread_auto_invite;
+    let config = &ctx.app_config().await.thread_auto_invite;
     invite_thread_by_roles(ctx, thread.id.widen(), &config.role_ids).await;
 }
 
@@ -111,7 +111,7 @@ async fn handle_guild_member_update(ctx: &Context, old: &Option<Member>, new: &O
         return;
     };
 
-    let config = &ctx.read_app_config().await.thread_auto_invite;
+    let config = &ctx.app_config().await.thread_auto_invite;
 
     let has_new_role = new.roles.contains(&config.display_role_id);
     let has_old_role = old.roles.contains(&config.display_role_id);

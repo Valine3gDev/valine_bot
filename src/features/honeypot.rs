@@ -16,7 +16,7 @@ use tracing::error;
 use valine_bot_macros::event_handler;
 
 use crate::{
-    app::BotDataGetter,
+    app::BotDataExt,
     utils::{create_message, create_safe_message, send_message},
 };
 
@@ -140,7 +140,7 @@ pub async fn handle_honeypot_event(ctx: &Context, event: &FullEvent) {
             return;
         }
 
-        let config = ctx.read_app_config().await;
+        let config = ctx.app_config().await;
 
         if config.honeypot.channel_id != new_message.channel_id.expect_channel() {
             return;

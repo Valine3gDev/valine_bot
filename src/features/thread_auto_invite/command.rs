@@ -1,7 +1,7 @@
 use poise::say_reply;
 
 use crate::{
-    app::{AppContext, AppError, BotDataGetter},
+    app::{AppContext, AppError, BotDataExt},
     features::thread_auto_invite::handler::{handle_role_assignment, handle_role_removal, invite_thread_by_roles},
     utils::{get_guild_members, has_authed_role, is_in_public_thread},
 };
@@ -17,7 +17,7 @@ use crate::{
     check = "is_in_public_thread"
 )]
 pub async fn invite_thread(ctx: AppContext<'_>) -> Result<(), AppError> {
-    let config = &ctx.read_app_config().await.thread_auto_invite;
+    let config = &ctx.app_config().await.thread_auto_invite;
     ctx.defer_ephemeral().await?;
     invite_thread_by_roles(ctx.serenity_context(), ctx.channel_id(), &config.role_ids).await;
     say_reply(ctx, "スレッドに招待しました。").await?;
@@ -29,7 +29,7 @@ pub async fn invite_thread(ctx: AppContext<'_>) -> Result<(), AppError> {
 pub async fn add_invite_role(ctx: AppContext<'_>) -> Result<(), AppError> {
     let members = get_guild_members(ctx.serenity_context(), ctx.guild_id().unwrap());
 
-    let config = &ctx.read_app_config().await.thread_auto_invite;
+    let config = &ctx.app_config().await.thread_auto_invite;
 
     ctx.defer().await?;
 
@@ -56,7 +56,7 @@ pub async fn add_invite_role(ctx: AppContext<'_>) -> Result<(), AppError> {
 pub async fn remove_invite_role(ctx: AppContext<'_>) -> Result<(), AppError> {
     let members = get_guild_members(ctx.serenity_context(), ctx.guild_id().unwrap());
 
-    let config = &ctx.read_app_config().await.thread_auto_invite;
+    let config = &ctx.app_config().await.thread_auto_invite;
 
     ctx.defer().await?;
 

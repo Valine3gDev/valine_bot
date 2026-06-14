@@ -18,10 +18,10 @@ impl BotData {
     }
 }
 
-pub trait BotDataGetter {
+pub trait BotDataExt {
     fn bot_data(&self) -> Arc<BotData>;
 
-    async fn read_app_config(&self) -> Arc<AppConfig> {
+    async fn app_config(&self) -> Arc<AppConfig> {
         self.bot_data().config.read().await.clone()
     }
 
@@ -31,19 +31,19 @@ pub trait BotDataGetter {
     }
 }
 
-impl BotDataGetter for Context {
+impl BotDataExt for Context {
     fn bot_data(&self) -> Arc<BotData> {
         self.data()
     }
 }
 
-impl<'a> BotDataGetter for AppContext<'a> {
+impl<'a> BotDataExt for AppContext<'a> {
     fn bot_data(&self) -> Arc<BotData> {
         self.data()
     }
 }
 
-impl<'a> BotDataGetter for AppApplicationContext<'a> {
+impl<'a> BotDataExt for AppApplicationContext<'a> {
     fn bot_data(&self) -> Arc<BotData> {
         self.data()
     }

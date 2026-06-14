@@ -20,7 +20,7 @@ use serenity::model::event::FullEvent;
 use serenity::small_fixed_array::FixedString;
 use tracing::error;
 
-use crate::app::{AppContext, AppError, BotDataGetter};
+use crate::app::{AppContext, AppError, BotDataExt};
 use crate::core::BotEventHandler;
 use crate::features::auth::utils::create_auth_log_message;
 use crate::utils::{create_ephemeral_message, create_interaction_message, create_message, create_model, send_message};
@@ -71,7 +71,7 @@ impl KeywordAuthEventHandler {
             return;
         }
 
-        let config = &ctx.read_app_config().await.auth;
+        let config = &ctx.app_config().await.auth;
         let member = interaction.member.as_ref().unwrap();
 
         if member.roles.contains(&config.role_id) {

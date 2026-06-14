@@ -13,7 +13,7 @@ use tokio::pin;
 use tracing::error;
 
 use crate::{
-    app::BotDataGetter,
+    app::BotDataExt,
     core::BotEventHandler,
     features::auth::utils::create_auth_log_message,
     utils::{create_message, send_message},
@@ -32,7 +32,7 @@ impl AutoKickEventHandler {
 
     async fn run_kick_loop(ctx: Context) {
         loop {
-            let config = ctx.read_app_config().await;
+            let config = ctx.app_config().await;
 
             let cached_members = ctx
                 .cache

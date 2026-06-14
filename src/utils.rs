@@ -19,7 +19,7 @@ use serenity::{
 use similar::{Algorithm, ChangeTag, TextDiff};
 use tracing::error;
 
-use crate::app::{AppContext, AppError, BotDataGetter, BotError};
+use crate::app::{AppContext, AppError, BotDataExt, BotError};
 
 pub fn create_safe_message<'a>() -> CreateMessage<'a> {
     CreateMessage::new().allowed_mentions(CreateAllowedMentions::new().all_users(false))
@@ -91,7 +91,7 @@ pub async fn has_authed_role(ctx: AppContext<'_>) -> Result<bool, AppError> {
         return Ok(false);
     };
 
-    let config = ctx.read_app_config().await;
+    let config = ctx.app_config().await;
     if !member.roles.contains(&config.auth.role_id) {
         Err(BotError::HasNoRole.into())
     } else {

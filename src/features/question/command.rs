@@ -12,7 +12,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::vec;
 
-use crate::app::{AppApplicationContext, AppError, BotDataGetter};
+use crate::app::{AppApplicationContext, AppError, BotDataExt};
 use crate::features::question::QUESTION_CLOSE_PREFIX;
 use crate::features::question::modal::{BasicQuestionData, DetailedQuestionData};
 use crate::features::question::question_creation_handler::{CustomIds, QuestionCreationHandler};
@@ -78,7 +78,7 @@ pub async fn question(ctx: AppApplicationContext<'_>) -> Result<(), AppError> {
         .label("質問を送信")
         .style(ButtonStyle::Success);
 
-    let config = &ctx.read_app_config().await.question;
+    let config = &ctx.app_config().await.question;
     let Ok(channel) = config.forum_id.to_guild_channel(&ctx, ctx.guild_id()).await else {
         return Err("Failed to create forum channel".into());
     };

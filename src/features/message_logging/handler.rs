@@ -6,7 +6,7 @@ use tracing::error;
 use valine_bot_macros::event_handler;
 
 use crate::{
-    app::BotDataGetter,
+    app::BotDataExt,
     extensions::MessageBuilderTimestampExt,
     features::message_logging::{embed_builder::build_embed, log_type::LogType},
     utils::{create_safe_message, send_message},
@@ -50,7 +50,7 @@ async fn create_and_send_log(ctx: &Context, message: &Message, log_type: LogType
 }
 
 async fn send_log<'a>(ctx: &Context, embed: CreateEmbed<'a>) {
-    let config = ctx.read_app_config().await;
+    let config = ctx.app_config().await;
     let log = create_safe_message().add_embed(embed);
     let _ = send_message(ctx, &config.message_logging.channel_id, log).await;
 }

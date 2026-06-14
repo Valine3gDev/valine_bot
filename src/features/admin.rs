@@ -1,6 +1,6 @@
 use poise::say_reply;
 
-use crate::app::{AppContext, AppError, BotDataGetter, config::AppConfig};
+use crate::app::{AppContext, AppError, BotDataExt, config::AppConfig};
 
 /// コンフィグを再読み込み
 #[poise::command(slash_command, ephemeral, owners_only, dm_only)]

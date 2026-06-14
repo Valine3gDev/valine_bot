@@ -9,7 +9,7 @@ use serenity::{
 };
 
 use crate::{
-    app::{AppContext, AppError, BotDataGetter, config::AppConfig},
+    app::{AppContext, AppError, BotDataExt, config::AppConfig},
     utils::has_authed_role,
 };
 
@@ -59,7 +59,7 @@ pub async fn pin(
     ctx: AppContext<'_>,
     #[description = "ピン留めするメッセージ (リンクかID)"] msg: Message,
 ) -> Result<(), AppError> {
-    let config = ctx.read_app_config().await;
+    let config = ctx.app_config().await;
     let channel = ctx.channel().await.unwrap();
 
     if !check_owner(ctx, &config, &channel).await {
