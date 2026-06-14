@@ -61,13 +61,8 @@ async fn main() -> Result<(), AppError> {
         event_handlers(&config).add(MainEventHandler::new()),
     )
     .framework(Box::new(framework))
-    // .event_handler(features::LoggingHandler)
-    // .event_handler(features::ThreadAutoInviteHandler::new())
-    // .event_handler(features::QuestionHandler)
-    // .event_handler(features::MessageCacheHandler::new(config.message_cache.disabled))
     .cache_settings(settings)
     .data(Arc::new(BotData::new(config)))
-    // .type_map_insert::<MessageCacheType>(Arc::new(MessageCache::new()))
     .await
     .expect("Err creating client");
 

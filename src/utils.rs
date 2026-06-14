@@ -9,7 +9,12 @@ use serenity::{
     builder::{
         CreateComponent, CreateInteractionResponse, CreateInteractionResponseMessage, CreateModal, CreateModalComponent,
     },
-    model::channel::GuildThread,
+    collector::CollectMessages,
+    model::{
+        channel::{ChannelType, GuildThread},
+        guild::Member,
+        id::GuildId,
+    },
 };
 use similar::{Algorithm, ChangeTag, TextDiff};
 use tracing::error;
@@ -55,40 +60,28 @@ pub fn create_model<'a>(
     CreateInteractionResponse::Modal(CreateModal::new(custom_id, title).components(components))
 }
 
-// /**
-// thread_create イベントにおいて、初期メッセージが送信されるか5秒経過するまで待機する
+/**
+thread_create イベントにおいて、初期メッセージが送信されるか5秒経過するまで待機する
 
-// 初期メッセージが送信されると、falseを返し、既に初期メッセージが存在する場合、true を返す
-// ```rs
-// pub struct Handler;
+初期メッセージが送信されると、falseを返し、既に初期メッセージが存在する場合、true を返す
+ */
+pub async fn await_initial_message(ctx: &Context, thread: &GuildThread) -> bool {
+    // Botがメッセージを送信すると二度イベントが発火するので、初期メッセージ送信後のイベントは無視する
+    if thread.base.last_message_id.is_some() {
+        return true;
+    }
 
-// #[async_trait]
-// impl EventHandler for Handler {
-//     async fn thread_create(&self, ctx: Context, thread: GuildChannel) {
-//         if await_thread_create(&ctx, &thread).await {
-//             return;
-//         }
-
-//         // 処理
-//     }
-// }
-// ```
-//  */
-// pub async fn await_initial_message(ctx: &Context, thread: &GuildChannel) -> bool {
-//     // Botがメッセージを送信すると二度イベントが発火するので、初期メッセージ送信後のイベントは無視する
-//     if thread.last_message_id.is_some() {
-//         return true;
-//     }
-
-//     // 初期メッセージが送信されるか、5秒経つまで待機
-//     thread
-//         .await_reply(&ctx.shard)
-//         .channel_id(thread.id)
-//         .author_id(thread.owner_id.unwrap())
-//         .timeout(Duration::from_secs(5))
-//         .await;
-//     false
-// }
+    // 初期メッセージが送信されるか、5秒経つまで待機
+    thread
+        .id
+        .widen()
+        .collect_messages(ctx)
+        .channel_id(thread.id.widen())
+        .author_id(thread.owner_id)
+        .timeout(Duration::from_secs(5))
+        .await;
+    false
+}
 
 /*
 認証済みロールを持っているかどうかを確認します。
@@ -106,17 +99,21 @@ pub async fn has_authed_role(ctx: AppContext<'_>) -> Result<bool, AppError> {
     }
 }
 
-// /*
-// 実行した場所がパブリックスレッドであるかどうかを確認します。
-// */
-// pub async fn is_in_public_thread(ctx: PContext<'_>) -> Result<bool, PError> {
-//     let channel = ctx.guild_channel().await.ok_or(BotError::IsNotInThread)?;
-//     match channel.kind {
-//         ChannelType::PublicThread | ChannelType::NewsThread => Ok(true),
-//         ChannelType::PrivateThread => Err(BotError::IsPrivateThread.into()),
-//         _ => Err(BotError::IsNotInThread.into()),
-//     }
-// }
+/*
+実行した場所がパブリックスレッドであるかどうかを確認します。
+*/
+pub async fn is_in_public_thread(ctx: AppContext<'_>) -> Result<bool, AppError> {
+    let thread = ctx
+        .channel()
+        .await
+        .and_then(|t| t.thread())
+        .ok_or(BotError::IsNotInThread)?;
+    match thread.base.kind {
+        ChannelType::PublicThread | ChannelType::NewsThread => Ok(true),
+        ChannelType::PrivateThread => Err(BotError::IsPrivateThread.into()),
+        _ => Err(BotError::IsNotInThread.into()),
+    }
+}
 
 const UNITS: [(u64, &str); 4] = [(86400, "日"), (3600, "時間"), (60, "分"), (1, "秒")];
 
@@ -199,10 +196,10 @@ pub fn create_diff_lines_text(old: &str, new: &str) -> String {
         .join("")
 }
 
-// pub fn get_guild_members(ctx: &Context, guild_id: GuildId) -> impl Iterator<Item = Member> {
-//     guild_id
-//         .to_guild_cached(ctx)
-//         .map(|guild| guild.members.clone().into_values())
-//         .into_iter()
-//         .flatten()
-// }
+pub fn get_guild_members(ctx: &Context, guild_id: GuildId) -> impl Iterator<Item = Member> {
+    guild_id
+        .to_guild_cached(&ctx.cache)
+        .map(|guild| guild.members.clone())
+        .into_iter()
+        .flatten()
+}

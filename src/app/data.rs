@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
+use poise::ApplicationContext;
 use serenity::all::prelude::Context;
 use tokio::sync::RwLock;
 
-use crate::app::{AppContext, config::AppConfig};
+use crate::app::{AppContext, AppError, config::AppConfig};
 
 pub struct BotData {
     config: RwLock<Arc<AppConfig>>,
