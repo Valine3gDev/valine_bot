@@ -29,7 +29,7 @@ pub async fn on_error(error: FrameworkError<'_, BotData, AppError>) {
     match error {
         FrameworkError::Command { error, ctx, .. } => {
             let _ = say_reply(ctx, "コマンド実行中にエラーが発生しました。").await;
-            error!("Command error: Command: {:#?}, Error: {error:#?}", ctx.command());
+            error!("Command error: Command: {}, Error: {error:#}", ctx.command().name);
         }
         FrameworkError::ArgumentParse { ctx, input, error, .. } => {
             let Some(input) = input else {
@@ -72,7 +72,7 @@ pub async fn on_error(error: FrameworkError<'_, BotData, AppError>) {
         }
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {
-                error!("Error while handling error: {e}")
+                error!("Error while handling error: {e:#?}")
             }
         }
     }

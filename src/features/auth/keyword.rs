@@ -168,7 +168,7 @@ impl KeywordAuthEventHandler {
 
         if let Err(error) = member.add_role(ctx.http(), config.role_id, Some("認証成功")).await {
             let log = create_message(format!(
-                "{} にロールを追加できませんでした。\n```\n{error:#?}```",
+                "{} にロールを追加できませんでした。\n```\n{error:#}```",
                 member.mention()
             ));
             let _ = send_message(ctx, &config.log_channel_id, log).await;
