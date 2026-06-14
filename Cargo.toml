@@ -21,8 +21,6 @@ serde_with = "3"
 similar = "3.1"
 sysinfo = "0.39"
 thiserror = "2"
-# 最新の Serenity と time 0.3.48 に互換性がない
-time = "=0.3.47"
 tokio = { version = "1.0", features = [ "rt-multi-thread", "macros", "signal" ] }
 toml = "1.0"
 tracing = "0.1"
