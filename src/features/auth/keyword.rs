@@ -4,6 +4,11 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::app::{AppContext, AppError, BotDataExt, BotError};
+use crate::core::BotEventHandler;
+use crate::features::auth::utils::create_auth_log_message;
+use crate::utils::{create_ephemeral_message, create_interaction_message, create_message, create_model, send_message};
+use anyhow::Context as _;
 use dashmap::DashMap;
 use poise::say_reply;
 use rand::seq::IndexedRandom;
@@ -18,12 +23,6 @@ use serenity::model::application::{ButtonStyle, LabelComponent, ModalComponent};
 use serenity::model::colour::colours::branding;
 use serenity::model::event::FullEvent;
 use serenity::small_fixed_array::FixedString;
-use tracing::error;
-
-use crate::app::{AppContext, AppError, BotDataExt};
-use crate::core::BotEventHandler;
-use crate::features::auth::utils::create_auth_log_message;
-use crate::utils::{create_ephemeral_message, create_interaction_message, create_message, create_model, send_message};
 
 const KEYWORD_INPUT_BUTTON_CUSTOM_ID: &str = "keyword_input:button";
 const FAILED_ATTEMPT_COOLDOWN: Duration = Duration::from_secs(60);
@@ -60,29 +59,33 @@ impl KeywordAuthEventHandler {
         self.cooldown_started_at.insert(user_id, Instant::now());
     }
 
-    async fn handle_interaction_create(&self, ctx: &Context, interaction: &Interaction) {
+    async fn handle_interaction_create(&self, ctx: &Context, interaction: &Interaction) -> Result<(), AppError> {
         let Interaction::Component(interaction) = interaction else {
-            return;
+            return Ok(());
         };
         let ComponentInteractionDataKind::Button = interaction.data.kind else {
-            return;
+            return Ok(());
         };
         if interaction.data.custom_id != KEYWORD_INPUT_BUTTON_CUSTOM_ID {
-            return;
+            return Ok(());
         }
 
         let config = &ctx.app_config().await.auth;
-        let member = interaction.member.as_ref().unwrap();
+        let member = interaction
+            .member
+            .as_ref()
+            .ok_or(BotError::MissingEventData("keyword auth interaction member"))?;
 
         if member.roles.contains(&config.role_id) {
-            let _ = interaction
+            interaction
                 .create_response(ctx.http(), create_ephemeral_message("既に認証済みです。", None))
-                .await;
-            return;
+                .await
+                .context("Failed to respond to an already authenticated member")?;
+            return Ok(());
         }
 
         if let Some(remaining_seconds) = self.remaining_cooldown_seconds(interaction.user.id) {
-            let _ = interaction
+            interaction
                 .create_response(
                     ctx.http(),
                     create_ephemeral_message(
@@ -90,8 +93,9 @@ impl KeywordAuthEventHandler {
                         None,
                     ),
                 )
-                .await;
-            return;
+                .await
+                .context("Failed to send authentication cooldown response")?;
+            return Ok(());
         }
 
         let mut keyword_input = CreateInputText::new(InputTextStyle::Short, "keyword")
@@ -102,9 +106,9 @@ impl KeywordAuthEventHandler {
             keyword_input = keyword_input.value(value);
         }
 
-        let modal_custom_id = FixedString::from_str(&interaction.id.to_string()).unwrap();
+        let modal_custom_id = FixedString::from_str(&interaction.id.to_string())?;
 
-        let _ = interaction
+        interaction
             .create_response(
                 ctx.http(),
                 create_model(
@@ -116,42 +120,50 @@ impl KeywordAuthEventHandler {
                     ))],
                 ),
             )
-            .await;
+            .await
+            .context("Failed to open keyword authentication modal")?;
 
         let Some(interaction) = ModalInteractionCollector::new(ctx)
             .custom_ids([modal_custom_id].to_vec())
             .timeout(Duration::from_secs(60))
             .await
         else {
-            let _ = interaction
+            interaction
                 .create_followup(
                     ctx.http(),
                     CreateInteractionResponseFollowup::new()
                         .content("時間切れです。もう一度お試しください。")
                         .ephemeral(true),
                 )
-                .await;
-            return;
+                .await
+                .context("Failed to send keyword authentication timeout response")?;
+            return Ok(());
         };
 
-        let submitted_keyword = if let ModalComponent::Label(label) = interaction.data.components.first().unwrap()
+        let component = interaction
+            .data
+            .components
+            .first()
+            .ok_or(BotError::MissingEventData("keyword auth modal components"))?;
+        let submitted_keyword = if let ModalComponent::Label(label) = component
             && let LabelComponent::InputText(text) = label.component.clone()
         {
             text.value
         } else {
-            return error!("Invalid modal interaction: {interaction:#?}");
+            return Err(BotError::InvalidEventData("keyword auth modal component").into());
         };
         let submitted_keyword = submitted_keyword.trim();
 
         if config.keyword != submitted_keyword {
-            let _ = interaction
+            interaction
                 .create_response(
                     ctx.http(),
                     create_interaction_message("合言葉が間違っています。", true, None),
                 )
-                .await;
+                .await
+                .context("Failed to send invalid keyword response")?;
             self.start_cooldown_for(interaction.user.id);
-            return;
+            return Ok(());
         }
 
         if let Err(error) = member.add_role(ctx.http(), config.role_id, Some("認証成功")).await {
@@ -160,20 +172,24 @@ impl KeywordAuthEventHandler {
                 member.mention()
             ));
             let _ = send_message(ctx, &config.log_channel_id, log).await;
-            return error!("Failed to add role: {error:#?}");
+            return Err(error).context("Failed to grant authentication role");
         }
 
-        let _ = send_message(
+        send_message(
             ctx,
             &config.log_channel_id,
             create_auth_log_message("認証成功", branding::GREEN, member, None),
         )
-        .await;
+        .await
+        .context("Failed to send authentication success log")?;
 
         const AUTH_SUCCESS_MESSAGE: &str = "合言葉を確認しました。\nチャンネルが表示されない場合、アプリの再起動や再読み込み(Ctrl + R)をお試しください。";
-        let _ = interaction
+        interaction
             .create_response(ctx.http(), create_interaction_message(AUTH_SUCCESS_MESSAGE, true, None))
-            .await;
+            .await
+            .context("Failed to send authentication success response")?;
+
+        Ok(())
     }
 }
 
@@ -181,7 +197,7 @@ impl KeywordAuthEventHandler {
 impl BotEventHandler for KeywordAuthEventHandler {
     async fn dispatch(&self, ctx: &Context, event: &FullEvent) -> Result<(), AppError> {
         if let FullEvent::InteractionCreate { interaction, .. } = event {
-            self.handle_interaction_create(ctx, interaction).await
+            self.handle_interaction_create(ctx, interaction).await?;
         }
 
         Ok(())
@@ -207,7 +223,8 @@ pub async fn create_keyword_button(
                     .style(ButtonStyle::Primary),
             ]))]),
         )
-        .await?;
+        .await
+        .context("Failed to create keyword authentication button")?;
 
     Ok(())
 }

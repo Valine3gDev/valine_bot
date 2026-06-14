@@ -3,16 +3,17 @@ use std::{
     time::Duration,
 };
 
+use anyhow::Context as _;
 use futures::StreamExt;
 use serenity::{
-    all::{Context, prelude::CacheHttp},
+    all::{Context, Member, prelude::CacheHttp},
     async_trait,
     model::{Color, event::FullEvent},
 };
 use tracing::error;
 
 use crate::{
-    app::{AppError, BotDataExt},
+    app::{AppError, BotDataExt, config::AppConfig},
     core::BotEventHandler,
     features::auth::utils::create_auth_log_message,
     utils::{create_message, send_message, stream_members},
@@ -29,54 +30,51 @@ impl AutoKickEventHandler {
         }
     }
 
+    async fn handle_member(ctx: &Context, member: &Member, config: &AppConfig) -> Result<(), AppError> {
+        if member.user.bot() || member.roles.contains(&config.auth.role_id) {
+            return Ok(());
+        }
+
+        let Some(joined_at) = member.joined_at else {
+            return Ok(());
+        };
+
+        if chrono::Utc::now().signed_duration_since(*joined_at) < config.auto_kick.grace_period {
+            return Ok(());
+        }
+
+        let dm_succeeded = member
+            .user
+            .id
+            .direct_message(ctx, create_message(&config.auto_kick.kick_message))
+            .await
+            .is_ok();
+
+        member
+            .kick(ctx.http(), Some("一定期間のうちに認証ロールが付与されていないため"))
+            .await
+            .context("Failed to auto-kick member")?;
+
+        send_message(
+            ctx,
+            &config.auth.log_channel_id,
+            create_auth_log_message("認証期限切れのため Kick", Color::ORANGE, member, Some(dm_succeeded)),
+        )
+        .await
+        .context("Failed to send auto-kick log")?;
+
+        Ok(())
+    }
+
     async fn run_kick_loop(ctx: Context) {
         loop {
             let config = ctx.app_config().await;
 
             let mut member_stream = stream_members(&ctx, config.auto_kick.guild_id);
             while let Some(member) = member_stream.next().await {
-                if member.user.bot() {
-                    continue;
+                if let Err(error) = Self::handle_member(&ctx, &member, &config).await {
+                    error!("Auto kick error for member {}: {error:#}", member.user.id);
                 }
-
-                if member.roles.contains(&config.auth.role_id) {
-                    continue;
-                }
-
-                let joined_at = match member.joined_at {
-                    Some(time) => *time,
-                    None => continue,
-                };
-
-                if chrono::Utc::now().signed_duration_since(joined_at) < config.auto_kick.grace_period {
-                    continue;
-                }
-
-                let dm_result = member
-                    .user
-                    .id
-                    .direct_message(&ctx, create_message(&config.auto_kick.kick_message))
-                    .await;
-
-                if let Err(error) = member
-                    .kick(ctx.http(), Some("一定期間のうちに認証ロールが付与されていないため"))
-                    .await
-                {
-                    error!("Failed to kick user: {error:#?}");
-                    // continue;
-                };
-
-                let _ = send_message(
-                    &ctx,
-                    &config.auth.log_channel_id,
-                    create_auth_log_message(
-                        "認証期限切れのため Kick",
-                        Color::ORANGE,
-                        &member,
-                        Some(dm_result.is_ok()),
-                    ),
-                )
-                .await;
             }
 
             tokio::time::sleep(Duration::from_secs(3600)).await;

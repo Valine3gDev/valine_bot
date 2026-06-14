@@ -1,109 +1,114 @@
+use anyhow::Context as _;
 use itertools::Itertools;
 use serenity::{
     all::{ChannelType, Context, EditMessage, GuildId, Member, Mentionable, RoleId, prelude::CacheHttp},
     model::{channel::GuildThread, event::FullEvent, id::GenericChannelId},
 };
-use tracing::{error, info};
+use tracing::info;
 use valine_bot_macros::event_handler;
 
 use crate::{
-    app::{AppError, BotDataExt, config::ThreadAutoInviteConfig},
+    app::{AppError, BotDataExt, BotError, config::ThreadAutoInviteConfig},
     utils::create_message,
 };
 
-async fn find_role(ctx: &Context, guild_id: GuildId, config: &ThreadAutoInviteConfig) -> Option<RoleId> {
+async fn find_role(ctx: &Context, guild_id: GuildId, config: &ThreadAutoInviteConfig) -> Result<RoleId, AppError> {
     let role_member_counts = ctx
         .http
         .get_guild_role_member_counts(guild_id)
         .await
-        .map_err(|e| error!("Failed to get guild role member counts: {e:#?}"))
-        .ok()?;
+        .context("Failed to get invite role member counts")?;
 
-    config.role_ids.iter().find_map(|&role_id| {
-        let count = *role_member_counts.get(&role_id)?;
-        (count < config.min_member_count).then_some(role_id)
-    })
+    config
+        .role_ids
+        .iter()
+        .find(|role_id| {
+            role_member_counts
+                .get(role_id)
+                .is_some_and(|&count| count < config.min_member_count)
+        })
+        .copied()
+        .ok_or_else(|| {
+            BotError::NoAvailableInviteRole {
+                member_limit: config.min_member_count,
+            }
+            .into()
+        })
 }
 
 pub(in crate::features::thread_auto_invite) async fn assign_role(
     ctx: &Context,
     new: &Member,
     config: &ThreadAutoInviteConfig,
-) {
-    let Some(role) = find_role(ctx, new.guild_id, config).await else {
-        error!("No role found with count less than {}", config.min_member_count);
-        return;
-    };
+) -> Result<(), AppError> {
+    let role = find_role(ctx, new.guild_id, config).await?;
 
-    if let Err(e) = new.add_role(ctx.http(), role, None).await {
-        error!("Failed to add role {role} to member {}: {e:#?}", new.user.id);
-    } else {
-        info!("Added role {role} to member {}", new.user.id);
-    }
+    new.add_role(ctx.http(), role, None)
+        .await
+        .context("Failed to assign invite role")?;
+    info!("Added role {role} to member {}", new.user.id);
+    Ok(())
 }
 
 pub(in crate::features::thread_auto_invite) async fn remove_role(
     ctx: &Context,
     old: &Member,
     config: &ThreadAutoInviteConfig,
-) {
-    let roles = old
-        .roles
-        .iter()
-        .filter(|r| config.role_ids.contains(r))
-        .collect::<Vec<_>>();
-
-    for role_id in roles {
-        if let Err(e) = old.remove_role(ctx.http(), *role_id, None).await {
-            error!("Failed to remove role {role_id} from member {}: {e:#?}", old.user.id);
-        } else {
-            info!("Removed role {role_id} from member {}", old.user.id);
-            break;
-        }
+) -> Result<(), AppError> {
+    if let Some(&role_id) = old.roles.iter().find(|role_id| config.role_ids.contains(role_id)) {
+        old.remove_role(ctx.http(), role_id, None)
+            .await
+            .context("Failed to remove invite role")?;
+        info!("Removed role {role_id} from member {}", old.user.id);
     }
+
+    Ok(())
 }
 
 pub(in crate::features::thread_auto_invite) async fn invite_thread_by_roles(
     ctx: &Context,
     thread_id: GenericChannelId,
     role_ids: &[RoleId],
-) {
-    let mut message = {
-        let msg = create_message("スレッド自動招待用メッセージ");
-        match thread_id.send_message(ctx.http(), msg).await {
-            Ok(m) => m,
-            Err(why) => return error!("Error sending message: {why:#?}"),
-        }
-    };
+) -> Result<(), AppError> {
+    let msg = create_message("スレッド自動招待用メッセージ");
+    let mut message = thread_id
+        .send_message(ctx.http(), msg)
+        .await
+        .context("Failed to send thread invite message")?;
 
     let content = role_ids.iter().map(|r| r.mention().to_string()).join(" ");
-    let _ = message.edit(&ctx, EditMessage::new().content(content)).await;
+    message
+        .edit(&ctx, EditMessage::new().content(content))
+        .await
+        .context("Failed to mention invite roles")?;
 
-    let _ = message.delete(ctx.http(), None).await;
+    message
+        .delete(ctx.http(), None)
+        .await
+        .context("Failed to delete thread invite message")?;
+    Ok(())
 }
 
-async fn handle_thread_create(ctx: &Context, thread: &GuildThread, newly_created: &Option<bool>) {
+async fn handle_thread_create(
+    ctx: &Context,
+    thread: &GuildThread,
+    newly_created: &Option<bool>,
+) -> Result<(), AppError> {
     if !newly_created.unwrap_or(false) {
-        return;
+        return Ok(());
     }
 
     if thread.base.kind == ChannelType::PrivateThread {
-        return;
+        return Ok(());
     }
 
     let config = &ctx.app_config().await.thread_auto_invite;
-    invite_thread_by_roles(ctx, thread.id.widen(), &config.role_ids).await;
+    invite_thread_by_roles(ctx, thread.id.widen(), &config.role_ids).await
 }
 
-async fn handle_guild_member_update(ctx: &Context, old: &Option<Member>, new: &Option<Member>) {
-    let Some(new) = new else {
-        error!("Member update event with no new member");
-        return;
-    };
-    let Some(old) = old else {
-        error!("Member update event with no old member");
-        return;
-    };
+async fn handle_guild_member_update(ctx: &Context, old: &Option<Member>, new: &Option<Member>) -> Result<(), AppError> {
+    let new = new.as_ref().ok_or(BotError::MissingEventData("updated member"))?;
+    let old = old.as_ref().ok_or(BotError::MissingEventData("previous member"))?;
 
     let config = &ctx.app_config().await.thread_auto_invite;
 
@@ -111,10 +116,12 @@ async fn handle_guild_member_update(ctx: &Context, old: &Option<Member>, new: &O
     let has_old_role = old.roles.contains(&config.display_role_id);
 
     if has_new_role && !has_old_role {
-        assign_role(ctx, new, config).await;
+        assign_role(ctx, new, config).await?;
     } else if has_old_role && !has_new_role {
-        remove_role(ctx, old, config).await;
+        remove_role(ctx, old, config).await?;
     }
+
+    Ok(())
 }
 
 #[event_handler]
@@ -122,11 +129,11 @@ pub async fn handle_thread_auto_invite_event(ctx: &Context, event: &FullEvent) -
     match event {
         FullEvent::ThreadCreate {
             thread, newly_created, ..
-        } => handle_thread_create(ctx, thread, newly_created).await,
+        } => handle_thread_create(ctx, thread, newly_created).await?,
 
         FullEvent::GuildMemberUpdate {
             old_if_available, new, ..
-        } => handle_guild_member_update(ctx, old_if_available, new).await,
+        } => handle_guild_member_update(ctx, old_if_available, new).await?,
 
         _ => {}
     }

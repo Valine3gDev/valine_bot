@@ -17,7 +17,7 @@ use crate::{app::AppError, core::BotEventHandler};
 
 #[event_error_handler]
 pub async fn handle_event_error(_ctx: &Context, event: &FullEvent, error: &AppError) {
-    error!("Event handler error: Event: {event:#?}, Error: {error:#?}");
+    error!("Event handler error: Event: {event:?}, Error: {error:#?}");
 }
 
 pub struct MainEventHandler {

@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use anyhow::Context as _;
 use futures::StreamExt;
 use poise::say_reply;
 use serenity::{
@@ -78,10 +79,12 @@ pub async fn pin(
 
     static PIN_REASON: Option<&str> = Some("/pin コマンドによる操作");
     if msg.pinned() {
-        msg.unpin(ctx.http(), PIN_REASON).await?;
+        msg.unpin(ctx.http(), PIN_REASON)
+            .await
+            .context("Failed to unpin message")?;
         say_reply(ctx, "ピン留めを解除しました。").await?;
     } else {
-        msg.pin(ctx.http(), PIN_REASON).await?;
+        msg.pin(ctx.http(), PIN_REASON).await.context("Failed to pin message")?;
         say_reply(ctx, "ピン留めしました。").await?;
     }
 

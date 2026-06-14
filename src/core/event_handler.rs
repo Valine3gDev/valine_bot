@@ -1,11 +1,15 @@
 use serenity::{all::prelude::Context, async_trait, http::RatelimitInfo, model::event::FullEvent};
-use tracing::error;
+use tracing::{Instrument, error, info_span};
 
-use crate::core::BoxError;
+use crate::core::AnyError;
 
 #[async_trait]
 pub trait BotEventHandler: Send + Sync {
-    async fn dispatch(&self, ctx: &Context, event: &FullEvent) -> Result<(), BoxError>;
+    async fn dispatch(&self, ctx: &Context, event: &FullEvent) -> Result<(), AnyError>;
+
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 
     #[allow(unused_variables)]
     async fn ratelimit(&self, data: &RatelimitInfo) {}
@@ -13,7 +17,7 @@ pub trait BotEventHandler: Send + Sync {
 
 #[async_trait]
 pub trait BotEventErrorHandler: Send + Sync {
-    async fn handle(&self, ctx: &Context, event: &FullEvent, error: &BoxError);
+    async fn handle(&self, ctx: &Context, event: &FullEvent, error: &AnyError);
 }
 
 pub struct BotEventHandlers {
@@ -30,13 +34,23 @@ impl BotEventHandlers {
     }
 
     pub async fn dispatch(&self, ctx: &Context, event: &FullEvent) {
+        let event_name: &'static str = event.into();
+
         for handler in &self.handlers {
-            if let Err(error) = handler.dispatch(ctx, event).await {
-                match &self.error_handler {
-                    Some(error_handler) => error_handler.handle(ctx, event, &error).await,
-                    None => error!("Unhandled event handler error: {error:#?}"),
+            async {
+                if let Err(error) = handler.dispatch(ctx, event).await {
+                    match &self.error_handler {
+                        Some(error_handler) => error_handler.handle(ctx, event, &error).await,
+                        None => error!("Unhandled event handler error: {error:#?}"),
+                    }
                 }
             }
+            .instrument(info_span!(
+                "event_handler",
+                event = event_name,
+                handler = handler.name()
+            ))
+            .await;
         }
     }
 

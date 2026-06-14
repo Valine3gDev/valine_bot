@@ -20,7 +20,7 @@ use crate::{
 pub async fn invite_thread(ctx: AppContext<'_>) -> Result<(), AppError> {
     let config = &ctx.app_config().await.thread_auto_invite;
     ctx.defer_ephemeral().await?;
-    invite_thread_by_roles(ctx.serenity_context(), ctx.channel_id(), &config.role_ids).await;
+    invite_thread_by_roles(ctx.serenity_context(), ctx.channel_id(), &config.role_ids).await?;
     say_reply(ctx, "スレッドに招待しました。").await?;
     Ok(())
 }
@@ -35,11 +35,11 @@ pub async fn add_invite_role(ctx: AppContext<'_>) -> Result<(), AppError> {
     let mut added_count = 0;
     while let Some(member) = members.next().await {
         if config.role_ids.iter().any(|r| member.roles.contains(r)) {
-            remove_role(ctx.serenity_context(), &member, config).await;
+            remove_role(ctx.serenity_context(), &member, config).await?;
         }
 
         if member.roles.contains(&config.display_role_id) {
-            assign_role(ctx.serenity_context(), &member, config).await;
+            assign_role(ctx.serenity_context(), &member, config).await?;
             added_count += 1;
             continue;
         }
@@ -62,7 +62,7 @@ pub async fn remove_invite_role(ctx: AppContext<'_>) -> Result<(), AppError> {
             continue;
         }
 
-        remove_role(ctx.serenity_context(), &member, config).await;
+        remove_role(ctx.serenity_context(), &member, config).await?;
         role_count += 1;
     }
 

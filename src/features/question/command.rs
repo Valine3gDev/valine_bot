@@ -17,6 +17,7 @@ use crate::features::question::QUESTION_CLOSE_PREFIX;
 use crate::features::question::modal::{BasicQuestionData, DetailedQuestionData};
 use crate::features::question::question_creation_handler::{CustomIds, QuestionCreationHandler};
 use crate::utils::has_authed_role;
+use anyhow::Context as _;
 
 fn reaction_from_forum_emoji(emoji: &ForumEmoji) -> Option<ReactionType> {
     match emoji.clone() {
@@ -79,9 +80,11 @@ pub async fn question(ctx: AppApplicationContext<'_>) -> Result<(), AppError> {
         .style(ButtonStyle::Success);
 
     let config = &ctx.app_config().await.question;
-    let Ok(channel) = config.forum_id.to_guild_channel(&ctx, ctx.guild_id()).await else {
-        return Err("Failed to create forum channel".into());
-    };
+    let channel = config
+        .forum_id
+        .to_guild_channel(&ctx, ctx.guild_id())
+        .await
+        .context("Failed to get question forum channel")?;
 
     let buttons = &[
         CreateButton::new(&custom_ids.basic)
@@ -104,7 +107,8 @@ pub async fn question(ctx: AppApplicationContext<'_>) -> Result<(), AppError> {
             ),
             CreateComponent::ActionRow(CreateActionRow::buttons(&buttons.clone())),
         ]))
-        .await?;
+        .await
+        .context("Failed to send question creation form")?;
 
     let basic_data = Arc::new(RwLock::new(None::<BasicQuestionData>));
     let detailed_data = Arc::new(RwLock::new(None::<DetailedQuestionData>));
@@ -155,7 +159,8 @@ pub async fn question(ctx: AppApplicationContext<'_>) -> Result<(), AppError> {
                     })),
                 ]),
         )
-        .await?;
+        .await
+        .context("Failed to enable question submit button")?;
 
     if submit_rx.recv().await.is_none() {
         debug!("submit_rx closed");
@@ -190,7 +195,8 @@ pub async fn question(ctx: AppApplicationContext<'_>) -> Result<(), AppError> {
             )
             .set_applied_tags(&*forum_tag_ids),
         )
-        .await?;
+        .await
+        .context("Failed to create question forum post")?;
 
     let msg = MessageBuilder::new()
         .push_line_safe("質問フォーラムを開始しました。")
@@ -199,7 +205,8 @@ pub async fn question(ctx: AppApplicationContext<'_>) -> Result<(), AppError> {
 
     message
         .edit(ctx.into(), CreateReply::default().content(msg).components(vec![]))
-        .await?;
+        .await
+        .context("Failed to send question creation result")?;
 
     Ok(())
 }

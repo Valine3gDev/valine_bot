@@ -1,1 +1,1 @@
-pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
+pub type AnyError = anyhow::Error;

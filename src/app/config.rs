@@ -3,6 +3,7 @@ use std::{
     path::Path,
 };
 
+use anyhow::Context as _;
 use chrono::Duration;
 use duration_str::deserialize_duration_chrono;
 use regex::Regex;
@@ -28,8 +29,10 @@ pub struct AppConfig {
 
 impl AppConfig {
     pub async fn from_file(path: &str) -> Result<Self, AppError> {
-        let text = read_to_string(path).await?;
-        Ok(toml::from_str(&text)?)
+        let text = read_to_string(path)
+            .await
+            .with_context(|| format!("Failed to read config file: {path}"))?;
+        toml::from_str(&text).with_context(|| format!("Failed to parse config file: {path}"))
     }
 }
 

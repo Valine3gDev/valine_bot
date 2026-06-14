@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use anyhow::Context as _;
 use chrono::Duration;
 use serenity::{
     all::prelude::{CacheHttp, Context},
@@ -16,7 +17,7 @@ use tracing::error;
 use valine_bot_macros::event_handler;
 
 use crate::{
-    app::{AppError, BotDataExt},
+    app::{AppError, BotDataExt, BotError},
     utils::{create_message, create_safe_message, send_message},
 };
 
@@ -81,11 +82,13 @@ fn collect_message_ids(
     guild_id: GuildId,
     target_message: impl Into<MessageFingerprint>,
     message_lookback: Duration,
-) -> HashMap<ChannelId, Vec<MessageId>> {
-    let Some(guild) = guild_id.to_guild_cached(&ctx.cache) else {
-        error!("guild {guild_id} not found in cache");
-        return HashMap::new();
-    };
+) -> Result<HashMap<ChannelId, Vec<MessageId>>, AppError> {
+    let guild = guild_id
+        .to_guild_cached(&ctx.cache)
+        .ok_or_else(|| BotError::CacheMiss {
+            resource: "guild",
+            id: guild_id.to_string(),
+        })?;
 
     let mut ids = HashMap::new();
     let cutoff = Timestamp::now().unix_timestamp() - message_lookback.num_seconds();
@@ -106,7 +109,7 @@ fn collect_message_ids(
         }
     }
 
-    ids
+    Ok(ids)
 }
 
 async fn delete_messages(ctx: &Context, messages: &HashMap<ChannelId, Vec<MessageId>>) {
@@ -151,21 +154,24 @@ pub async fn handle_honeypot_event(ctx: &Context, event: &FullEvent) -> Result<(
             .direct_message(&ctx, create_message(&config.honeypot.kick_message))
             .await;
 
-        let Ok(member) = new_message.member(&ctx).await else {
-            error!("user {} not found", author.id);
-            return Ok(());
-        };
+        let member = new_message
+            .member(&ctx)
+            .await
+            .context("Failed to get honeypot message author as guild member")?;
 
-        let _ = member
+        member
             .kick(ctx.http(), Some("ハニーポットにメッセージを送信したため"))
-            .await;
+            .await
+            .context("Failed to kick honeypot message author")?;
 
         let delete_message_ids = collect_message_ids(
             ctx,
-            new_message.guild_id.unwrap(),
+            new_message
+                .guild_id
+                .ok_or(BotError::MissingEventData("honeypot message guild ID"))?,
             new_message,
             config.honeypot.message_lookback,
-        );
+        )?;
         delete_messages(ctx, &delete_message_ids).await;
 
         let mut log_builder = MessageBuilder::new()
@@ -197,12 +203,13 @@ pub async fn handle_honeypot_event(ctx: &Context, event: &FullEvent) -> Result<(
                 Some("ユーザーアイコン".into()),
             );
 
-        let _ = send_message(
+        send_message(
             ctx,
             &config.honeypot.log_channel_id,
             create_safe_message().add_embed(embed),
         )
-        .await;
+        .await
+        .context("Failed to send honeypot log")?;
     }
 
     Ok(())

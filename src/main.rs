@@ -6,10 +6,12 @@ mod utils;
 
 use std::sync::Arc;
 
+use anyhow::Context as _;
 use bpaf::Bpaf;
 use poise::{Framework, FrameworkOptions, PrefixFrameworkOptions};
 use serenity::{cache::Settings as CacheSettings, prelude::*};
 use tracing::error;
+use tracing_subscriber::EnvFilter;
 
 use crate::{
     app::{AppError, BotData, MainEventHandler, config::AppConfig, handle_event_error, on_error},
@@ -24,9 +26,20 @@ struct Options {
     check_config: bool,
 }
 
+fn init_tracing() {
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(true)
+        .with_file(true)
+        .with_line_number(true)
+        .init();
+}
+
 #[tokio::main]
 async fn main() -> Result<(), AppError> {
-    tracing_subscriber::fmt::init();
+    init_tracing();
 
     let config = AppConfig::from_file("config.toml").await?;
 
@@ -71,7 +84,7 @@ async fn main() -> Result<(), AppError> {
     .cache_settings(settings)
     .data(Arc::new(BotData::new(config)))
     .await
-    .expect("Err creating client");
+    .context("Failed to create Discord client")?;
 
     let shutdown = client.shard_manager.get_shutdown_trigger();
     tokio::spawn(async move {
@@ -81,8 +94,8 @@ async fn main() -> Result<(), AppError> {
         shutdown()
     });
 
-    if let Err(why) = client.start().await {
-        error!("Client error: {:#?}", why);
+    if let Err(error) = client.start().await.context("Discord client stopped with an error") {
+        error!("Client error: {error:#}");
     }
 
     Ok(())

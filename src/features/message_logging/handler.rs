@@ -1,3 +1,4 @@
+use anyhow::Context as _;
 use serenity::{
     all::{Context, CreateEmbed, Mentionable, Message, MessageBuilder, MessageId, Timestamp},
     model::{event::FullEvent, id::GenericChannelId},
@@ -6,15 +7,15 @@ use tracing::error;
 use valine_bot_macros::event_handler;
 
 use crate::{
-    app::{AppError, BotDataExt},
+    app::{AppError, BotDataExt, BotError},
     extensions::MessageBuilderTimestampExt,
     features::message_logging::{embed_builder::build_embed, log_type::LogType},
     utils::{create_safe_message, send_message},
 };
 
-async fn create_and_send_log(ctx: &Context, message: &Message, log_type: LogType) {
+async fn create_and_send_log(ctx: &Context, message: &Message, log_type: LogType) -> Result<(), AppError> {
     if message.author.bot() {
-        return;
+        return Ok(());
     }
 
     let description = MessageBuilder::new()
@@ -46,22 +47,30 @@ async fn create_and_send_log(ctx: &Context, message: &Message, log_type: LogType
 
     let new_content = log_type.new_content().unwrap_or("");
     embed = build_embed(message, new_content, embed);
-    send_log(ctx, embed).await;
+    send_log(ctx, embed).await
 }
 
-async fn send_log<'a>(ctx: &Context, embed: CreateEmbed<'a>) {
+async fn send_log<'a>(ctx: &Context, embed: CreateEmbed<'a>) -> Result<(), AppError> {
     let config = ctx.app_config().await;
     let log = create_safe_message().add_embed(embed);
-    let _ = send_message(ctx, &config.message_logging.channel_id, log).await;
+    send_message(ctx, &config.message_logging.channel_id, log)
+        .await
+        .context("Failed to send message log")?;
+    Ok(())
 }
 
-async fn handle_message_update(ctx: &Context, old_if_available: &Option<Message>, new_message: &Message) {
-    let Some(message) = old_if_available else {
-        return error!("Failed to get message: {}", new_message.id);
-    };
+async fn handle_message_update(
+    ctx: &Context,
+    old_if_available: &Option<Message>,
+    new_message: &Message,
+) -> Result<(), AppError> {
+    let message = old_if_available.as_ref().ok_or_else(|| BotError::CacheMiss {
+        resource: "message",
+        id: new_message.id.to_string(),
+    })?;
 
     if message.content == new_message.content {
-        return;
+        return Ok(());
     }
 
     create_and_send_log(
@@ -71,19 +80,31 @@ async fn handle_message_update(ctx: &Context, old_if_available: &Option<Message>
             new_content: new_message.content.to_string(),
         },
     )
-    .await;
+    .await
 }
 
-async fn handle_message_delete(ctx: &Context, channel_id: &GenericChannelId, deleted_message_id: &MessageId) {
-    let message = match ctx.cache.message(*channel_id, *deleted_message_id) {
-        Some(message) => message.clone(),
-        None => return error!("Failed to get message: {deleted_message_id}"),
-    };
+async fn handle_message_delete(
+    ctx: &Context,
+    channel_id: &GenericChannelId,
+    deleted_message_id: &MessageId,
+) -> Result<(), AppError> {
+    let message = ctx
+        .cache
+        .message(*channel_id, *deleted_message_id)
+        .ok_or_else(|| BotError::CacheMiss {
+            resource: "message",
+            id: deleted_message_id.to_string(),
+        })?
+        .clone();
 
-    create_and_send_log(ctx, &message, LogType::Delete).await;
+    create_and_send_log(ctx, &message, LogType::Delete).await
 }
 
-async fn handle_message_delete_bulk(ctx: &Context, channel_id: &GenericChannelId, deleted_message_ids: &[MessageId]) {
+async fn handle_message_delete_bulk(
+    ctx: &Context,
+    channel_id: &GenericChannelId,
+    deleted_message_ids: &[MessageId],
+) -> Result<(), AppError> {
     for message_id in deleted_message_ids {
         let message = match ctx.cache.message(*channel_id, *message_id) {
             Some(message) => message.clone(),
@@ -92,8 +113,10 @@ async fn handle_message_delete_bulk(ctx: &Context, channel_id: &GenericChannelId
                 continue;
             }
         };
-        create_and_send_log(ctx, &message, LogType::Delete).await;
+        create_and_send_log(ctx, &message, LogType::Delete).await?;
     }
+
+    Ok(())
 }
 
 #[event_handler]
@@ -103,19 +126,19 @@ pub async fn handle_message_logging_event(ctx: &Context, event: &FullEvent) -> R
             old_if_available,
             event,
             ..
-        } => handle_message_update(ctx, old_if_available, &event.message).await,
+        } => handle_message_update(ctx, old_if_available, &event.message).await?,
 
         FullEvent::MessageDelete {
             channel_id,
             deleted_message_id,
             ..
-        } => handle_message_delete(ctx, channel_id, deleted_message_id).await,
+        } => handle_message_delete(ctx, channel_id, deleted_message_id).await?,
 
         FullEvent::MessageDeleteBulk {
             channel_id,
             multiple_deleted_messages_ids,
             ..
-        } => handle_message_delete_bulk(ctx, channel_id, multiple_deleted_messages_ids).await,
+        } => handle_message_delete_bulk(ctx, channel_id, multiple_deleted_messages_ids).await?,
 
         _ => {}
     }

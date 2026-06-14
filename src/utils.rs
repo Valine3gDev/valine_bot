@@ -1,5 +1,6 @@
 use std::{borrow::Cow, time::Duration};
 
+use crate::app::{AppContext, AppError, BotDataExt, BotError};
 use async_stream::stream;
 use futures::{
     Stream, StreamExt,
@@ -19,9 +20,6 @@ use serenity::{
     },
 };
 use similar::{Algorithm, ChangeTag, TextDiff};
-use tracing::error;
-
-use crate::app::{AppContext, AppError, BotDataExt, BotError};
 
 pub fn create_safe_message<'a>() -> CreateMessage<'a> {
     CreateMessage::new().allowed_mentions(CreateAllowedMentions::new().all_users(false))
@@ -115,13 +113,7 @@ pub fn format_duration(duration: Duration, mut count: usize) -> String {
 }
 
 pub async fn send_message<'a>(ctx: &Context, channel_id: &ChannelId, builder: CreateMessage<'a>) -> Result<Message> {
-    match channel_id.widen().send_message(ctx.http(), builder).await {
-        Ok(m) => Ok(m),
-        Err(why) => {
-            error!("Error sending message: {:#?}", why);
-            Err(why)
-        }
-    }
+    channel_id.widen().send_message(ctx.http(), builder).await
 }
 
 /**

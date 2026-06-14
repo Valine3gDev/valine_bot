@@ -15,6 +15,14 @@ pub enum BotError {
     IsNotInThread,
     #[error("プライベートスレッドでは実行できません。")]
     IsPrivateThread,
+    #[error("イベントに必要なデータがありません: {0}")]
+    MissingEventData(&'static str),
+    #[error("イベントデータが不正です: {0}")]
+    InvalidEventData(&'static str),
+    #[error("キャッシュにデータがありません: {resource} ({id})")]
+    CacheMiss { resource: &'static str, id: String },
+    #[error("付与可能な招待用ロールがありません (メンバー数上限: {member_limit})")]
+    NoAvailableInviteRole { member_limit: u32 },
 }
 
 pub async fn on_error(error: FrameworkError<'_, BotData, AppError>) {
@@ -27,14 +35,6 @@ pub async fn on_error(error: FrameworkError<'_, BotData, AppError>) {
             let Some(input) = input else {
                 return error!("Error parsing input: {error:#?}");
             };
-
-            // let error = match error.downcast_ref::<MessageParseError>() {
-            //     Some(MessageParseError::Malformed) => {
-            //         "メッセージとして解析できませんでした。\nメッセージID、メッセージURL形式で入力してください。"
-            //     }
-            //     Some(MessageParseError::Http(_)) => "メッセージを取得できませんでした。",
-            //     _ => &error.to_string(),
-            // };
 
             let _ = say_reply(ctx, format!("入力 `{input}` の解析に失敗しました。\n{error:#?}")).await;
         }
@@ -72,7 +72,7 @@ pub async fn on_error(error: FrameworkError<'_, BotData, AppError>) {
         }
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {
-                println!("Error while handling error: {e:#?}")
+                error!("Error while handling error: {e}")
             }
         }
     }

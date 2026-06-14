@@ -6,6 +6,7 @@ use std::{str::FromStr, time::Duration};
 
 pub use command::question;
 
+use anyhow::Context as _;
 use serenity::{
     all::{
         ButtonStyle, CacheHttp, ComponentInteractionCollector, ComponentInteractionDataKind, Context, CreateActionRow,
@@ -14,53 +15,55 @@ use serenity::{
     builder::CreateComponent,
     model::event::FullEvent,
 };
-use tracing::error;
 use valine_bot_macros::event_handler;
 
 use crate::{
-    app::{AppError, BotDataExt},
+    app::{AppError, BotDataExt, BotError},
     utils::create_interaction_message,
 };
 
 pub static QUESTION_CLOSE_PREFIX: &str = "close_question_forum";
 
-async fn handle_interaction_create(ctx: &Context, interaction: &Interaction) {
+async fn handle_interaction_create(ctx: &Context, interaction: &Interaction) -> Result<(), AppError> {
     let Interaction::Component(interaction) = interaction else {
-        return;
+        return Ok(());
     };
     let ComponentInteractionDataKind::Button = interaction.data.kind else {
-        return;
+        return Ok(());
     };
     let custom_id = &interaction.data.custom_id;
     if !custom_id.starts_with(QUESTION_CLOSE_PREFIX) {
-        return;
+        return Ok(());
     }
 
-    let (_, author_id) = custom_id.split_at(QUESTION_CLOSE_PREFIX.len() + 1);
-    let author_id = UserId::from_str(author_id).unwrap();
+    let author_id = custom_id
+        .strip_prefix(QUESTION_CLOSE_PREFIX)
+        .and_then(|value| value.strip_prefix(':'))
+        .ok_or(BotError::InvalidEventData("question close custom ID"))?;
+    let author_id = UserId::from_str(author_id)?;
     if author_id != interaction.user.id {
-        return;
+        return Ok(());
     }
 
     let config = &ctx.app_config().await.question;
-    let Ok(thread) = interaction
+    let thread = interaction
         .channel_id
         .expect_thread()
         .to_thread(&ctx, interaction.guild_id)
         .await
-    else {
-        return error!("Failed to get channel: {:#?}", interaction.channel_id);
-    };
+        .context("Failed to get question thread")?;
     if thread.applied_tags.contains(&config.solved_tag) {
-        let _ = interaction
+        interaction
             .create_response(ctx.http(), create_interaction_message("既に解決済みです。", true, None))
-            .await;
+            .await
+            .context("Failed to send already-solved response")?;
+        return Ok(());
     }
 
     let confirm_custom_id = format!("close_question_confirm:{}", interaction.id);
     let cancel_custom_id = format!("close_question_cancel:{}", interaction.id);
 
-    let _ = interaction
+    interaction
         .create_response(
             ctx.http(),
             create_interaction_message(
@@ -78,7 +81,8 @@ async fn handle_interaction_create(ctx: &Context, interaction: &Interaction) {
                 ]))]),
             ),
         )
-        .await;
+        .await
+        .context("Failed to send question close confirmation")?;
 
     let res = ComponentInteractionCollector::new(ctx)
         .custom_ids(
@@ -108,21 +112,24 @@ async fn handle_interaction_create(ctx: &Context, interaction: &Interaction) {
                     .applied_tags(applied_tags),
             )
             .await
-            .unwrap();
+            .context("Failed to mark question thread as solved")?;
     }
 
-    let _ = interaction
+    interaction
         .edit_response(
             ctx.http(),
             EditInteractionResponse::new().content(text).components(vec![]),
         )
-        .await;
+        .await
+        .context("Failed to update question close response")?;
+
+    Ok(())
 }
 
 #[event_handler]
 pub async fn handle_question_event(ctx: &Context, event: &FullEvent) -> Result<(), AppError> {
     if let FullEvent::InteractionCreate { interaction, .. } = event {
-        handle_interaction_create(ctx, interaction).await;
+        handle_interaction_create(ctx, interaction).await?;
     }
 
     Ok(())
