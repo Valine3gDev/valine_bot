@@ -8,7 +8,7 @@ use valine_bot_macros::event_handler;
 
 use crate::{
     app::{BotDataExt, config::ThreadAutoInviteConfig},
-    utils::{await_initial_message, create_message},
+    utils::create_message,
 };
 
 async fn find_role(ctx: &Context, guild_id: GuildId, config: &ThreadAutoInviteConfig) -> Option<RoleId> {
@@ -83,17 +83,11 @@ pub(in crate::features::thread_auto_invite) async fn invite_thread_by_roles(
 }
 
 async fn handle_thread_create(ctx: &Context, thread: &GuildThread, newly_created: &Option<bool>) {
-    info!("created: {newly_created:#?}");
-
     if !newly_created.unwrap_or(false) {
         return;
     }
 
     if thread.base.kind == ChannelType::PrivateThread {
-        return;
-    }
-
-    if await_initial_message(ctx, thread).await {
         return;
     }
 

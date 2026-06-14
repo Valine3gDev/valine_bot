@@ -9,7 +9,6 @@ use serenity::{
     builder::{
         CreateComponent, CreateInteractionResponse, CreateInteractionResponseMessage, CreateModal, CreateModalComponent,
     },
-    collector::CollectMessages,
     model::{
         channel::{ChannelType, GuildThread},
         guild::Member,
@@ -58,29 +57,6 @@ pub fn create_model<'a>(
     components: impl Into<Cow<'a, [CreateModalComponent<'a>]>>,
 ) -> CreateInteractionResponse<'a> {
     CreateInteractionResponse::Modal(CreateModal::new(custom_id, title).components(components))
-}
-
-/**
-thread_create イベントにおいて、初期メッセージが送信されるか5秒経過するまで待機する
-
-初期メッセージが送信されると、falseを返し、既に初期メッセージが存在する場合、true を返す
- */
-pub async fn await_initial_message(ctx: &Context, thread: &GuildThread) -> bool {
-    // Botがメッセージを送信すると二度イベントが発火するので、初期メッセージ送信後のイベントは無視する
-    if thread.base.last_message_id.is_some() {
-        return true;
-    }
-
-    // 初期メッセージが送信されるか、5秒経つまで待機
-    thread
-        .id
-        .widen()
-        .collect_messages(ctx)
-        .channel_id(thread.id.widen())
-        .author_id(thread.owner_id)
-        .timeout(Duration::from_secs(5))
-        .await;
-    false
 }
 
 /*
