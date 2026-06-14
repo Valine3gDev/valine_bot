@@ -67,7 +67,6 @@ fn create_select_menu<'a>(
     guild_only,
     aliases("質問開始"),
     member_cooldown = 60,
-    required_bot_permissions = "CREATE_PUBLIC_THREADS",
     check = "has_authed_role"
 )]
 pub async fn question(ctx: AppApplicationContext<'_>) -> Result<(), AppError> {
