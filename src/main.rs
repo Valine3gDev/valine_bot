@@ -53,7 +53,7 @@ async fn main() -> Result<(), AppError> {
         | GatewayIntents::MESSAGE_CONTENT;
 
     let mut settings = CacheSettings::default();
-    settings.max_messages = 1_000_000;
+    settings.max_messages = usize::MAX;
 
     let mut client = create_client(
         config.bot.token.clone(),

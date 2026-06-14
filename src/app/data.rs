@@ -3,21 +3,16 @@ use std::sync::Arc;
 use serenity::all::prelude::Context;
 use tokio::sync::RwLock;
 
-use crate::{
-    app::{AppContext, config::AppConfig},
-    core::MessageCache,
-};
+use crate::app::{AppContext, config::AppConfig};
 
 pub struct BotData {
     config: RwLock<Arc<AppConfig>>,
-    message_cache: Arc<MessageCache>,
 }
 
 impl BotData {
     pub fn new(config: AppConfig) -> Self {
         Self {
             config: RwLock::new(Arc::new(config)),
-            message_cache: Arc::new(MessageCache::new()),
         }
     }
 }
@@ -32,10 +27,6 @@ pub trait BotDataGetter {
     async fn replace_app_config(&self, config: AppConfig) {
         let data = self.bot_data();
         *data.config.write().await = Arc::new(config);
-    }
-
-    fn message_cache(&self) -> Arc<MessageCache> {
-        Arc::clone(&self.bot_data().message_cache)
     }
 }
 

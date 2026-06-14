@@ -7,19 +7,15 @@ use serenity::{
     async_trait,
     model::{
         Permissions,
-        channel::{GenericGuildChannelRef, GuildThread, Message},
+        channel::{GenericGuildChannelRef, GuildThread},
         event::FullEvent,
-        id::{GenericChannelId, MessageId},
+        id::GenericChannelId,
     },
     small_fixed_array::FixedString,
 };
 use tracing::{error, info};
 
-use crate::{
-    app::{BotDataGetter, config::AppConfig},
-    core::BotEventHandler,
-    utils::fetch_all_archived_public_thread,
-};
+use crate::{app::BotDataGetter, core::BotEventHandler, utils::fetch_all_archived_public_thread};
 
 enum ChannelWrapper {
     Channel(GuildChannel),
@@ -39,14 +35,6 @@ impl ChannelWrapper {
             Self::Channel(c) => c.id.widen(),
             Self::Thread(t) => t.id.widen(),
         }
-    }
-
-    fn parent_id(&self) -> Option<GenericChannelId> {
-        match self {
-            Self::Channel(c) => c.parent_id,
-            Self::Thread(t) => Some(t.parent_id),
-        }
-        .map(|id| id.widen())
     }
 
     fn name(&self) -> FixedString<u16> {
@@ -82,23 +70,8 @@ impl MessageCacheHandler {
         }
     }
 
-    async fn cache_channel_message(
-        &self,
-        ctx: &Context,
-        config: &AppConfig,
-        channel: ChannelWrapper,
-        guild: &Guild,
-        bot_member: &Member,
-    ) {
+    async fn cache_channel_message(&self, ctx: &Context, channel: ChannelWrapper, guild: &Guild, bot_member: &Member) {
         if !channel.is_text_based() {
-            return;
-        }
-
-        let is_ignored = [Some(channel.id()), channel.parent_id()]
-            .iter()
-            .filter_map(|id| *id)
-            .any(|id| config.message_cache.ignore_channel_ids.contains(&id.expect_channel()));
-        if is_ignored {
             return;
         }
 
@@ -110,20 +83,17 @@ impl MessageCacheHandler {
             return;
         }
 
-        let messages = channel
+        // Context を渡すと Serenity 標準キャッシュに取得結果が載るようになる
+        let collected_count = channel
             .id()
-            .messages_iter(&ctx.http())
-            .take(config.message_cache.limit)
+            .messages_iter(&ctx)
             .take_while(|x| future::ready(x.is_ok()))
             .filter_map(|x| future::ready(x.ok()))
-            .collect::<Vec<_>>()
+            .count()
             .await;
 
-        let cache = ctx.message_cache();
-        let len = messages.len();
-        cache.extend_messages(messages);
         info!(
-            "Cached {len} messages for channel: {} ({})",
+            "Cached {collected_count} messages for channel: {} ({})",
             channel.name(),
             channel.id()
         );
@@ -172,66 +142,20 @@ impl MessageCacheHandler {
                     }
                 }
             }
-            .map(|c| self.cache_channel_message(ctx, &config, c, &guild, &bot_member))
+            .map(|c| self.cache_channel_message(ctx, c, &guild, &bot_member))
             .buffer_unordered(20)
             .collect::<Vec<_>>()
             .await;
         }
         info!("Cache ready!");
     }
-
-    async fn handle_message_create(&self, ctx: &Context, new_message: &Message) {
-        let cache = ctx.message_cache();
-        cache.insert(new_message.clone());
-    }
-
-    async fn handle_message_update(&self, ctx: &Context, new_message: &Message) {
-        let cache = ctx.message_cache();
-        cache.insert(new_message.clone());
-    }
-
-    async fn handle_message_delete(&self, ctx: &Context, channel_id: &GenericChannelId, message_id: &MessageId) {
-        let cache = ctx.message_cache();
-        cache.remove(*channel_id, *message_id);
-    }
-
-    async fn handle_message_delete_bulk(
-        &self,
-        ctx: &Context,
-        channel_id: &GenericChannelId,
-        message_ids: &[MessageId],
-    ) {
-        let cache = ctx.message_cache();
-        cache.remove_all(*channel_id, message_ids);
-    }
 }
 
 #[async_trait]
 impl BotEventHandler for MessageCacheHandler {
     async fn dispatch(&self, ctx: &Context, event: &FullEvent) {
-        match event {
-            FullEvent::CacheReady { .. } => self.handle_cache_ready(ctx).await,
-
-            FullEvent::Message { new_message, .. } => self.handle_message_create(ctx, new_message).await,
-
-            FullEvent::MessageUpdate { event, .. } => self.handle_message_update(ctx, &event.message).await,
-
-            FullEvent::MessageDelete {
-                channel_id,
-                deleted_message_id,
-                ..
-            } => self.handle_message_delete(ctx, channel_id, deleted_message_id).await,
-
-            FullEvent::MessageDeleteBulk {
-                channel_id,
-                multiple_deleted_messages_ids,
-                ..
-            } => {
-                self.handle_message_delete_bulk(ctx, channel_id, multiple_deleted_messages_ids)
-                    .await
-            }
-
-            _ => {}
+        if let FullEvent::CacheReady { .. } = event {
+            self.handle_cache_ready(ctx).await
         }
     }
 }
