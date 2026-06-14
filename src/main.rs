@@ -7,7 +7,7 @@ mod utils;
 use std::sync::Arc;
 
 use bpaf::Bpaf;
-use poise::{Framework, FrameworkOptions};
+use poise::{Framework, FrameworkOptions, PrefixFrameworkOptions};
 use serenity::{cache::Settings as CacheSettings, prelude::*};
 use tracing::error;
 
@@ -39,6 +39,11 @@ async fn main() -> Result<(), AppError> {
 
     let framework = Framework::builder()
         .options(FrameworkOptions {
+            prefix_options: PrefixFrameworkOptions {
+                prefix: None,
+                mention_as_prefix: false,
+                ..Default::default()
+            },
             commands: commands(),
             on_error: |error| Box::pin(on_error(error)),
             skip_checks_for_owners: false,
