@@ -92,7 +92,12 @@ impl EventHandler for Handler {
 
             interaction
                 .channel_id
-                .edit_thread(ctx.http(), EditThread::new().applied_tags(applied_tags))
+                .edit_thread(
+                    ctx.http(),
+                    EditThread::new()
+                        .name(format!("{}{}", config.solved_name_prefix, channel.name))
+                        .applied_tags(applied_tags),
+                )
                 .await
                 .unwrap();
         }
