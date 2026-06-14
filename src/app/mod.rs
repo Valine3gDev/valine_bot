@@ -10,4 +10,4 @@ pub mod utils;
 pub use data::{BotData, BotDataGetter};
 pub use error::{BotError, on_error};
 pub use event_handler::MainEventHandler;
-pub use types::{AppCommand, AppContext, AppError};
+pub use types::{AppApplicationContext, AppCommand, AppContext, AppError};

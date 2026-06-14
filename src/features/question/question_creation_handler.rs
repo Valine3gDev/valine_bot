@@ -7,6 +7,7 @@ use serenity::{
         ComponentInteractionDataKind, Context, ForumTagId, ModalInteractionCollector, ModalInteractionData,
     },
     futures::StreamExt,
+    small_fixed_array::{FixedArray, FixedString},
 };
 use tokio::sync::{RwLock, mpsc};
 use tracing::error;
@@ -14,29 +15,34 @@ use tracing::error;
 use super::modal::{BasicQuestionData, DetailedQuestionData};
 
 pub struct CustomIds {
-    pub basic: String,
-    pub detailed: String,
-    pub select_tag: String,
-    pub submit: String,
+    pub basic: FixedString,
+    pub detailed: FixedString,
+    pub select_tag: FixedString,
+    pub submit: FixedString,
 }
 
 impl CustomIds {
     pub fn new(id: u64) -> Self {
         Self {
-            basic: format!("open_basic_question_modal:{id}"),
-            detailed: format!("open_detailed_question_modal:{id}"),
-            select_tag: format!("question_select_tag:{id}"),
-            submit: format!("question_submit:{id}"),
+            basic: format!("open_basic_question_modal:{id}").try_into().unwrap(),
+            detailed: format!("open_detailed_question_modal:{id}").try_into().unwrap(),
+            select_tag: format!("question_select_tag:{id}").try_into().unwrap(),
+            submit: format!("question_submit:{id}").try_into().unwrap(),
         }
     }
 
-    pub fn to_vec(&self) -> Vec<String> {
-        vec![
+    pub fn to_vec(&self) -> Vec<FixedString> {
+        [
             self.basic.clone(),
             self.detailed.clone(),
             self.select_tag.clone(),
             self.submit.clone(),
         ]
+        .to_vec()
+    }
+
+    pub fn to_fixed_array(&self) -> FixedArray<FixedString> {
+        self.to_vec().try_into().unwrap()
     }
 }
 
@@ -78,13 +84,7 @@ impl QuestionCreationHandler {
     }
 
     async fn parse_response<M: Modal>(&self, data: &ModalInteractionData) -> Option<M> {
-        match M::parse(data.clone()) {
-            Ok(data) => Some(data),
-            Err(e) => {
-                error!("Failed to parse modal data: {e:#?}, {data:#?}");
-                None
-            }
-        }
+        Some(M::parse(data.clone()))
     }
 
     pub fn handle_component_interaction(&self) {
@@ -95,8 +95,8 @@ impl QuestionCreationHandler {
     }
 
     async fn _handle_component_interaction(self) {
-        let mut stream = ComponentInteractionCollector::new(self.ctx.shard.clone())
-            .custom_ids(self.custom_ids.to_vec())
+        let mut stream = ComponentInteractionCollector::new(&self.ctx)
+            .custom_ids(self.custom_ids.to_fixed_array())
             .timeout(TIMEOUT)
             .stream();
         let http = self.ctx.http();
@@ -148,7 +148,7 @@ impl QuestionCreationHandler {
     }
 
     async fn _handle_modal_interaction(self) {
-        let mut stream = ModalInteractionCollector::new(self.ctx.shard.clone())
+        let mut stream = ModalInteractionCollector::new(&self.ctx)
             .custom_ids(self.custom_ids.to_vec())
             .timeout(TIMEOUT)
             .stream();

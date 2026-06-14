@@ -4,7 +4,7 @@ use poise::ApplicationContext;
 use serenity::all::prelude::Context;
 use tokio::sync::RwLock;
 
-use crate::app::{AppContext, AppError, config::AppConfig};
+use crate::app::{AppApplicationContext, AppContext, AppError, config::AppConfig};
 
 pub struct BotData {
     config: RwLock<Arc<AppConfig>>,
@@ -38,6 +38,12 @@ impl BotDataGetter for Context {
 }
 
 impl<'a> BotDataGetter for AppContext<'a> {
+    fn bot_data(&self) -> Arc<BotData> {
+        self.data()
+    }
+}
+
+impl<'a> BotDataGetter for AppApplicationContext<'a> {
     fn bot_data(&self) -> Arc<BotData> {
         self.data()
     }
