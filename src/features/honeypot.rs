@@ -16,7 +16,7 @@ use tracing::error;
 use valine_bot_macros::event_handler;
 
 use crate::{
-    app::BotDataExt,
+    app::{AppError, BotDataExt},
     utils::{create_message, create_safe_message, send_message},
 };
 
@@ -132,18 +132,18 @@ async fn delete_messages(ctx: &Context, messages: &HashMap<ChannelId, Vec<Messag
 }
 
 #[event_handler]
-pub async fn handle_honeypot_event(ctx: &Context, event: &FullEvent) {
+pub async fn handle_honeypot_event(ctx: &Context, event: &FullEvent) -> Result<(), AppError> {
     if let FullEvent::Message { new_message, .. } = event {
         let author = &new_message.author;
 
         if author.bot() {
-            return;
+            return Ok(());
         }
 
         let config = ctx.app_config().await;
 
         if config.honeypot.channel_id != new_message.channel_id.expect_channel() {
-            return;
+            return Ok(());
         }
 
         let dm_message = author
@@ -153,7 +153,7 @@ pub async fn handle_honeypot_event(ctx: &Context, event: &FullEvent) {
 
         let Ok(member) = new_message.member(&ctx).await else {
             error!("user {} not found", author.id);
-            return;
+            return Ok(());
         };
 
         let _ = member
@@ -204,4 +204,6 @@ pub async fn handle_honeypot_event(ctx: &Context, event: &FullEvent) {
         )
         .await;
     }
+
+    Ok(())
 }

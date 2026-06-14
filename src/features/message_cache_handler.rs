@@ -15,7 +15,11 @@ use serenity::{
 };
 use tracing::{error, info};
 
-use crate::{app::BotDataExt, core::BotEventHandler, utils::fetch_all_archived_public_thread};
+use crate::{
+    app::{AppError, BotDataExt},
+    core::BotEventHandler,
+    utils::fetch_all_archived_public_thread,
+};
 
 enum ChannelWrapper {
     Channel(GuildChannel),
@@ -153,9 +157,11 @@ impl MessageCacheHandler {
 
 #[async_trait]
 impl BotEventHandler for MessageCacheHandler {
-    async fn dispatch(&self, ctx: &Context, event: &FullEvent) {
+    async fn dispatch(&self, ctx: &Context, event: &FullEvent) -> Result<(), AppError> {
         if let FullEvent::CacheReady { .. } = event {
             self.handle_cache_ready(ctx).await
         }
+
+        Ok(())
     }
 }

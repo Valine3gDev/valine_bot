@@ -179,10 +179,12 @@ impl KeywordAuthEventHandler {
 
 #[async_trait]
 impl BotEventHandler for KeywordAuthEventHandler {
-    async fn dispatch(&self, ctx: &Context, event: &FullEvent) {
+    async fn dispatch(&self, ctx: &Context, event: &FullEvent) -> Result<(), AppError> {
         if let FullEvent::InteractionCreate { interaction, .. } = event {
             self.handle_interaction_create(ctx, interaction).await
         }
+
+        Ok(())
     }
 }
 

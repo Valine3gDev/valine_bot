@@ -11,8 +11,14 @@ use serenity::{
 use sysinfo::{Pid, System};
 use tokio::task::JoinHandle;
 use tracing::{error, info, warn};
+use valine_bot_macros::event_error_handler;
 
-use crate::core::BotEventHandler;
+use crate::{app::AppError, core::BotEventHandler};
+
+#[event_error_handler]
+pub async fn handle_event_error(_ctx: &Context, event: &FullEvent, error: &AppError) {
+    error!("Event handler error: Event: {event:#?}, Error: {error:#?}");
+}
 
 pub struct MainEventHandler {
     activity_task: Mutex<Option<JoinHandle<()>>>,
@@ -64,7 +70,7 @@ impl MainEventHandler {
 
 #[async_trait]
 impl BotEventHandler for MainEventHandler {
-    async fn dispatch(&self, ctx: &Context, event: &FullEvent) {
+    async fn dispatch(&self, ctx: &Context, event: &FullEvent) -> Result<(), AppError> {
         if let FullEvent::CacheReady { .. } = event {
             self.handle_cache_ready(ctx).await;
         }
@@ -75,6 +81,8 @@ impl BotEventHandler for MainEventHandler {
             FullEvent::GuildCreate { guild, .. } => self.handle_guild_create(ctx, guild).await,
             _ => {}
         }
+
+        Ok(())
     }
 
     async fn ratelimit(&self, data: &RatelimitInfo) {

@@ -12,7 +12,7 @@ use serenity::{cache::Settings as CacheSettings, prelude::*};
 use tracing::error;
 
 use crate::{
-    app::{AppError, BotData, MainEventHandler, config::AppConfig, on_error},
+    app::{AppError, BotData, MainEventHandler, config::AppConfig, handle_event_error, on_error},
     core::create_client,
     features::{commands, event_handlers},
 };
@@ -63,7 +63,9 @@ async fn main() -> Result<(), AppError> {
     let mut client = create_client(
         config.bot.token.clone(),
         intents,
-        event_handlers(&config).add(MainEventHandler::new()),
+        event_handlers(&config)
+            .add(MainEventHandler::new())
+            .on_error(handle_event_error),
     )
     .framework(Box::new(framework))
     .cache_settings(settings)

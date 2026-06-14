@@ -12,7 +12,7 @@ use serenity::{
 use tracing::error;
 
 use crate::{
-    app::BotDataExt,
+    app::{AppError, BotDataExt},
     core::BotEventHandler,
     features::auth::utils::create_auth_log_message,
     utils::{create_message, send_message, stream_members},
@@ -95,9 +95,11 @@ impl AutoKickEventHandler {
 
 #[async_trait]
 impl BotEventHandler for AutoKickEventHandler {
-    async fn dispatch(&self, ctx: &Context, event: &FullEvent) {
+    async fn dispatch(&self, ctx: &Context, event: &FullEvent) -> Result<(), AppError> {
         if let FullEvent::CacheReady { .. } = event {
             self.handle_cache_ready(ctx).await;
         }
+
+        Ok(())
     }
 }

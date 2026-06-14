@@ -7,7 +7,7 @@ use tracing::{error, info};
 use valine_bot_macros::event_handler;
 
 use crate::{
-    app::{BotDataExt, config::ThreadAutoInviteConfig},
+    app::{AppError, BotDataExt, config::ThreadAutoInviteConfig},
     utils::create_message,
 };
 
@@ -118,7 +118,7 @@ async fn handle_guild_member_update(ctx: &Context, old: &Option<Member>, new: &O
 }
 
 #[event_handler]
-pub async fn handle_thread_auto_invite_event(ctx: &Context, event: &FullEvent) {
+pub async fn handle_thread_auto_invite_event(ctx: &Context, event: &FullEvent) -> Result<(), AppError> {
     match event {
         FullEvent::ThreadCreate {
             thread, newly_created, ..
@@ -130,4 +130,6 @@ pub async fn handle_thread_auto_invite_event(ctx: &Context, event: &FullEvent) {
 
         _ => {}
     }
+
+    Ok(())
 }

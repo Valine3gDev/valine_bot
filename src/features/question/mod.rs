@@ -17,7 +17,10 @@ use serenity::{
 use tracing::error;
 use valine_bot_macros::event_handler;
 
-use crate::{app::BotDataExt, utils::create_interaction_message};
+use crate::{
+    app::{AppError, BotDataExt},
+    utils::create_interaction_message,
+};
 
 pub static QUESTION_CLOSE_PREFIX: &str = "close_question_forum";
 
@@ -117,8 +120,10 @@ async fn handle_interaction_create(ctx: &Context, interaction: &Interaction) {
 }
 
 #[event_handler]
-pub async fn handle_question_event(ctx: &Context, event: &FullEvent) {
+pub async fn handle_question_event(ctx: &Context, event: &FullEvent) -> Result<(), AppError> {
     if let FullEvent::InteractionCreate { interaction, .. } = event {
         handle_interaction_create(ctx, interaction).await;
     }
+
+    Ok(())
 }

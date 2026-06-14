@@ -6,7 +6,7 @@ use tracing::error;
 use valine_bot_macros::event_handler;
 
 use crate::{
-    app::BotDataExt,
+    app::{AppError, BotDataExt},
     extensions::MessageBuilderTimestampExt,
     features::message_logging::{embed_builder::build_embed, log_type::LogType},
     utils::{create_safe_message, send_message},
@@ -97,7 +97,7 @@ async fn handle_message_delete_bulk(ctx: &Context, channel_id: &GenericChannelId
 }
 
 #[event_handler]
-pub async fn handle_message_logging_event(ctx: &Context, event: &FullEvent) {
+pub async fn handle_message_logging_event(ctx: &Context, event: &FullEvent) -> Result<(), AppError> {
     match event {
         FullEvent::MessageUpdate {
             old_if_available,
@@ -119,4 +119,6 @@ pub async fn handle_message_logging_event(ctx: &Context, event: &FullEvent) {
 
         _ => {}
     }
+
+    Ok(())
 }
