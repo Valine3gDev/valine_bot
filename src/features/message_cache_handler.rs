@@ -74,7 +74,7 @@ impl MessageCacheHandler {
         }
     }
 
-    async fn cache_channel_message(&self, ctx: &Context, channel: ChannelWrapper, guild: &Guild, bot_member: &Member) {
+    async fn cache_channel_message(ctx: &Context, channel: ChannelWrapper, guild: &Guild, bot_member: &Member) {
         if !channel.is_text_based() {
             return;
         }
@@ -103,11 +103,7 @@ impl MessageCacheHandler {
         );
     }
 
-    async fn handle_cache_ready(&self, ctx: &Context) {
-        if self.disabled || self.collected.swap(true, Ordering::Relaxed) {
-            return;
-        }
-
+    async fn collect_cache(ctx: Context) {
         let config = ctx.app_config().await;
 
         for guild_id in &config.message_cache.target_guild_ids {
@@ -132,6 +128,7 @@ impl MessageCacheHandler {
             };
 
             let active_threads = guild.threads.clone();
+            let ctx = &ctx;
             let _ = stream! {
                 for thread in active_threads {
                     yield ChannelWrapper::Thread(thread);
@@ -146,12 +143,20 @@ impl MessageCacheHandler {
                     }
                 }
             }
-            .map(|c| self.cache_channel_message(ctx, c, &guild, &bot_member))
+            .map(|c| Self::cache_channel_message(ctx, c, &guild, &bot_member))
             .buffer_unordered(20)
             .collect::<Vec<_>>()
             .await;
         }
         info!("Cache ready!");
+    }
+
+    async fn handle_cache_ready(&self, ctx: &Context) {
+        if self.disabled || self.collected.swap(true, Ordering::Relaxed) {
+            return;
+        }
+
+        tokio::spawn(Self::collect_cache(ctx.clone()));
     }
 }
 
