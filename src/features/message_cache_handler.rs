@@ -1,4 +1,7 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    sync::atomic::{AtomicBool, Ordering},
+    time::Duration,
+};
 
 use async_stream::stream;
 use futures::{StreamExt, future};
@@ -13,6 +16,7 @@ use serenity::{
     },
     small_fixed_array::FixedString,
 };
+use tokio::time::sleep;
 use tracing::{error, info};
 
 use crate::{
@@ -74,7 +78,14 @@ impl MessageCacheHandler {
         }
     }
 
-    async fn cache_channel_message(ctx: &Context, channel: ChannelWrapper, guild: &Guild, bot_member: &Member) {
+    async fn cache_channel_message(
+        ctx: &Context,
+        channel: ChannelWrapper,
+        guild: &Guild,
+        bot_member: &Member,
+        request_window: Duration,
+        requests_per_window: usize,
+    ) {
         if !channel.is_text_based() {
             return;
         }
@@ -87,10 +98,20 @@ impl MessageCacheHandler {
             return;
         }
 
+        let messages_per_window = requests_per_window.saturating_mul(100);
+
         // Context を渡すと Serenity 標準キャッシュに取得結果が載るようになる
         let collected_count = channel
             .id()
-            .messages_iter(&ctx)
+            .messages_iter(ctx)
+            .enumerate()
+            .map(|(index, message)| async move {
+                if (index + 1) % messages_per_window == 0 {
+                    sleep(request_window).await;
+                }
+                message
+            })
+            .buffered(1)
             .take_while(|x| future::ready(x.is_ok()))
             .filter_map(|x| future::ready(x.ok()))
             .count()
@@ -105,6 +126,9 @@ impl MessageCacheHandler {
 
     async fn collect_cache(ctx: Context) {
         let config = ctx.app_config().await;
+        let request_window = config.message_cache.request_window;
+        let requests_per_window: usize = config.message_cache.requests_per_window.max(1).into();
+        let concurrent_channels: usize = config.message_cache.concurrent_channels.max(1).into();
 
         for guild_id in &config.message_cache.target_guild_ids {
             let guild = match guild_id.to_guild_cached(&ctx.cache) {
@@ -143,8 +167,8 @@ impl MessageCacheHandler {
                     }
                 }
             }
-            .map(|c| Self::cache_channel_message(ctx, c, &guild, &bot_member))
-            .buffer_unordered(20)
+            .map(|c| Self::cache_channel_message(ctx, c, &guild, &bot_member, request_window, requests_per_window))
+            .buffer_unordered(concurrent_channels)
             .collect::<Vec<_>>()
             .await;
         }

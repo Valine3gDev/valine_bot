@@ -48,6 +48,12 @@ disabled = false
 # 過去のメッセージのキャッシュを取るギルドIDのリスト
 # target_guild_ids = ["651286346861641735"]
 target_guild_ids = [ "000000000000000000" ]
+# リクエスト数を制限する時間枠
+request_window = "5s"
+# 時間枠内で許可するリクエスト数
+requests_per_window = 5
+# 同時に過去メッセージを取得するチャンネル数
+concurrent_channels = 20
 
 
 [pin]

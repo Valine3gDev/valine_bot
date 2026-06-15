@@ -1,11 +1,12 @@
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
+    time::Duration as StdDuration,
 };
 
 use anyhow::Context as _;
 use chrono::Duration;
-use duration_str::deserialize_duration_chrono;
+use duration_str::{deserialize_duration, deserialize_duration_chrono};
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
 use serde_with::{DisplayFromStr, serde_as};
@@ -77,6 +78,10 @@ pub struct MessageLoggingConfig {
 pub struct MessageCacheConfig {
     pub disabled: bool,
     pub target_guild_ids: Vec<GuildId>,
+    #[serde(deserialize_with = "deserialize_duration")]
+    pub request_window: StdDuration,
+    pub requests_per_window: u8,
+    pub concurrent_channels: u8,
 }
 
 #[derive(Debug, Deserialize)]
