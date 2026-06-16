@@ -74,50 +74,46 @@ pub(in crate::features::message_logging) fn build_poll_field<'a>(
     embed.field("__**投票**__", builder.build(), false)
 }
 
-enum DiffLine<'a> {
-    OmittedEqualBlock {
-        first_line: &'a str,
-        last_line: &'a str,
-        omitted_line_count: usize,
-    },
-    Change(Change<&'a str>),
+fn format_omitted_equal(head: Option<&str>, tail: Option<&str>, count: usize) -> String {
+    let head = head.map(|line| format!("  {line}")).unwrap_or_default();
+    let tail = tail.map(|line| format!("  {line}")).unwrap_or_default();
+
+    format!("{head}  ... {count}行省略\n{tail}")
+}
+
+fn format_change(change: Change<&'_ str>) -> String {
+    match change.tag() {
+        ChangeTag::Delete => format!("- {change}"),
+        ChangeTag::Insert => format!("+ {change}"),
+        ChangeTag::Equal => format!("  {change}"),
+    }
 }
 
 fn create_diff_lines_text(old: &str, new: &str) -> String {
     let diff = TextDiff::configure().algorithm(Algorithm::Myers).diff_lines(old, new);
-    diff.iter_all_changes()
-        .chunk_by(|c| c.tag())
+    let grouped_changes = diff.iter_all_changes().chunk_by(|c| c.tag());
+    let diff_chunks = grouped_changes.into_iter().collect_vec();
+    let last_chunk_index = diff_chunks.len() - 1;
+    diff_chunks
         .into_iter()
-        .flat_map(|(tag, changes)| match tag {
-            ChangeTag::Delete | ChangeTag::Insert => Either::Left(changes.map(DiffLine::Change)),
+        .enumerate()
+        .flat_map(|(chunk_index, (tag, changes))| match tag {
+            ChangeTag::Delete | ChangeTag::Insert => Either::Left(changes.map(format_change)),
             ChangeTag::Equal => {
-                let equal_changes = changes.collect_vec();
-                if equal_changes.len() <= 3 {
-                    Either::Right(Either::Left(equal_changes.into_iter().map(DiffLine::Change)))
+                let changes = changes.collect_vec();
+                if changes.len() <= 3 {
+                    Either::Right(Either::Left(changes.into_iter().map(format_change)))
                 } else {
-                    let first_line = equal_changes.first().unwrap().value();
-                    let last_line = equal_changes.last().unwrap().value();
-                    let omitted_line_count = equal_changes.len() - 2;
+                    let has_head = chunk_index != 0;
+                    let has_tail = chunk_index != last_chunk_index;
 
-                    Either::Right(Either::Right(iter::once(DiffLine::OmittedEqualBlock {
-                        first_line,
-                        last_line,
-                        omitted_line_count,
-                    })))
+                    Either::Right(Either::Right(iter::once(format_omitted_equal(
+                        has_head.then(|| changes.first().unwrap().value()),
+                        has_tail.then(|| changes.last().unwrap().value()),
+                        changes.len() - ((has_head as usize) + (has_tail as usize)),
+                    ))))
                 }
             }
-        })
-        .map(|line| match line {
-            DiffLine::Change(change) => match change.tag() {
-                ChangeTag::Delete => format!("- {change}"),
-                ChangeTag::Insert => format!("+ {change}"),
-                ChangeTag::Equal => format!("  {change}"),
-            },
-            DiffLine::OmittedEqualBlock {
-                first_line,
-                last_line,
-                omitted_line_count,
-            } => format!("  {first_line}  ... {omitted_line_count}行省略\n  {last_line}"),
         })
         .join("")
 }
