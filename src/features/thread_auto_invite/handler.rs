@@ -1,7 +1,10 @@
+use std::time::Duration;
+
 use anyhow::Context as _;
 use itertools::Itertools;
 use serenity::{
     all::{ChannelType, Context, EditMessage, GuildId, Member, Mentionable, RoleId, prelude::CacheHttp},
+    collector::CollectMessages,
     model::{channel::GuildThread, event::FullEvent, id::GenericChannelId},
 };
 use tracing::info;
@@ -89,6 +92,24 @@ pub(in crate::features::thread_auto_invite) async fn invite_thread_by_roles(
     Ok(())
 }
 
+/**
+イベントにおいて、初期メッセージが送信されるか5秒経過するまで待機する
+*/
+pub async fn await_initial_message(ctx: &Context, thread: &GuildThread) {
+    if thread.base.last_message_id.is_some() {
+        return;
+    }
+
+    thread
+        .id
+        .widen()
+        .collect_messages(ctx)
+        .channel_id(thread.id.widen())
+        .author_id(thread.owner_id)
+        .timeout(Duration::from_secs(5))
+        .await;
+}
+
 async fn handle_thread_create(
     ctx: &Context,
     thread: &GuildThread,
@@ -101,6 +122,8 @@ async fn handle_thread_create(
     if thread.base.kind == ChannelType::PrivateThread {
         return Ok(());
     }
+
+    await_initial_message(ctx, thread).await;
 
     let config = &ctx.app_config().await.thread_auto_invite;
     invite_thread_by_roles(ctx, thread.id.widen(), &config.role_ids).await
