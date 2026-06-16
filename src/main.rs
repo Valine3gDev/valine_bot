@@ -15,7 +15,7 @@ use tracing_subscriber::EnvFilter;
 
 use crate::{
     app::{AppError, BotData, MainEventHandler, config::AppConfig, handle_event_error, on_error},
-    core::create_client,
+    core::{create_client, install_signal_handler},
     features::{commands, event_handlers},
 };
 
@@ -86,13 +86,7 @@ async fn main() -> Result<(), AppError> {
     .await
     .context("Failed to create Discord client")?;
 
-    let shutdown = client.shard_manager.get_shutdown_trigger();
-    tokio::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Could not register ctrl+c handler");
-        shutdown()
-    });
+    install_signal_handler(&client);
 
     if let Err(error) = client.start().await.context("Discord client stopped with an error") {
         error!("Client error: {error:#}");
