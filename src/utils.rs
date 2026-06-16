@@ -6,7 +6,6 @@ use futures::{
     Stream, StreamExt,
     stream::{self, BoxStream},
 };
-use itertools::Itertools;
 use serenity::{
     Result,
     all::{ChannelId, Context, CreateAllowedMentions, CreateMessage, Message, prelude::CacheHttp},
@@ -19,7 +18,6 @@ use serenity::{
         id::GuildId,
     },
 };
-use similar::{Algorithm, ChangeTag, TextDiff};
 
 pub fn create_safe_message<'a>() -> CreateMessage<'a> {
     CreateMessage::new().allowed_mentions(CreateAllowedMentions::new().all_users(false))
@@ -154,17 +152,6 @@ pub async fn fetch_all_archived_public_thread(
             }
         }
     })
-}
-
-pub fn create_diff_lines_text(old: &str, new: &str) -> String {
-    let diff = TextDiff::configure().algorithm(Algorithm::Myers).diff_lines(old, new);
-    diff.iter_all_changes()
-        .map(|c| match c.tag() {
-            ChangeTag::Delete => format!("- {c}"),
-            ChangeTag::Insert => format!("+ {c}"),
-            ChangeTag::Equal => format!("  {c}"),
-        })
-        .join("")
 }
 
 pub fn stream_members(ctx: &Context, guild_id: GuildId) -> BoxStream<'_, Member> {
