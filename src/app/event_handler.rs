@@ -13,11 +13,18 @@ use tokio::task::JoinHandle;
 use tracing::{error, info, warn};
 use valine_bot_macros::event_error_handler;
 
-use crate::{app::AppError, core::BotEventHandler};
+use crate::{
+    app::{AppError, BotError},
+    core::BotEventHandler,
+};
 
 #[event_error_handler]
 pub async fn handle_event_error(_ctx: &Context, event: &FullEvent, error: &AppError) {
-    error!("Event handler error: Event: {event:?}, Error: {error:#?}");
+    if let Some(error) = error.downcast_ref::<BotError>() {
+        error!("{error}");
+    } else {
+        error!("Event handler error: Event: {event:?}, Error: {error:#?}");
+    }
 }
 
 pub struct MainEventHandler {
