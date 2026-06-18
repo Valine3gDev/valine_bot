@@ -181,6 +181,11 @@ async fn handle_message_update(
         id: new_message.id.to_string(),
     })?;
 
+    // リンクの埋め込みが展開される際、更新としてイベントが発火することがあるので、無視するように
+    if new_message.embeds.len() != message.embeds.len() {
+        return Ok(());
+    }
+
     send_message_log(
         ctx,
         message,
