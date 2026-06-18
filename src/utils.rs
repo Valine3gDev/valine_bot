@@ -19,8 +19,15 @@ use serenity::{
     },
 };
 
+pub fn create_safe_allowed_mentions<'a>() -> CreateAllowedMentions<'a> {
+    CreateAllowedMentions::new()
+        .all_users(false)
+        .all_roles(false)
+        .everyone(false)
+}
+
 pub fn create_safe_message<'a>() -> CreateMessage<'a> {
-    CreateMessage::new().allowed_mentions(CreateAllowedMentions::new().all_users(false))
+    CreateMessage::new().allowed_mentions(create_safe_allowed_mentions())
 }
 
 pub fn create_message<'a>(content: impl Into<Cow<'a, str>>) -> CreateMessage<'a> {

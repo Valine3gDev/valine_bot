@@ -12,7 +12,7 @@ use valine_bot_macros::event_handler;
 
 use crate::{
     app::{AppError, BotDataExt, BotError, config::ThreadAutoInviteConfig},
-    utils::create_message,
+    utils::{create_message, create_safe_allowed_mentions},
 };
 
 async fn find_role(ctx: &Context, guild_id: GuildId, config: &ThreadAutoInviteConfig) -> Result<RoleId, AppError> {
@@ -79,9 +79,13 @@ pub(in crate::features::thread_auto_invite) async fn invite_thread_by_roles(
         .await
         .context("Failed to send thread invite message")?;
 
-    let content = role_ids.iter().map(|r| r.mention().to_string()).join(" ");
     message
-        .edit(&ctx, EditMessage::new().content(content))
+        .edit(
+            &ctx,
+            EditMessage::new()
+                .allowed_mentions(create_safe_allowed_mentions().roles(role_ids))
+                .content(role_ids.iter().map(|r| r.mention().to_string()).join(" ")),
+        )
         .await
         .context("Failed to mention invite roles")?;
 
