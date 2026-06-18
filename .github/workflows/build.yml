@@ -48,8 +48,8 @@ jobs:
         uses: moonrepo/setup-rust@abb2d32350334249b178c401e5ec5836e0cd88d3 # v1.3.0
         with:
           cache-target: debug
-          cache-extra-identifier: ${{ matrix.target }}
-          target-dirs: target/${{ matrix.target }}
+          cache-extra-identifier: check-${{ matrix.target }}
+          target-dirs: target
           targets: ${{ matrix.target }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
