@@ -1,4 +1,4 @@
-mod embed_builder;
+mod component_builder;
 mod handler;
 mod log_type;
 

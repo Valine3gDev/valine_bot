@@ -1,15 +1,22 @@
-use serenity::model::Color;
+use itertools::Itertools;
+use serenity::{
+    model::{Color, channel::Attachment, id::AttachmentId},
+    small_fixed_array::{FixedArray, FixedString},
+};
 
-pub(in crate::features::message_logging) enum LogType {
-    Edit { new_content: String },
+pub(in crate::features::message_logging) enum MessageLogKind<'a> {
+    Edit {
+        content_after: &'a FixedString<u16>,
+        attachments_after: &'a FixedArray<Attachment>,
+    },
     Delete,
 }
 
-impl LogType {
+impl MessageLogKind<'_> {
     pub fn name(&self) -> &'static str {
         match self {
-            LogType::Edit { .. } => "編集",
-            LogType::Delete => "削除",
+            MessageLogKind::Edit { .. } => "編集",
+            MessageLogKind::Delete => "削除",
         }
     }
 
@@ -19,15 +26,22 @@ impl LogType {
 
     pub fn color(&self) -> Color {
         match self {
-            LogType::Edit { .. } => Color::ORANGE,
-            LogType::Delete => Color::RED,
+            MessageLogKind::Edit { .. } => Color::ORANGE,
+            MessageLogKind::Delete => Color::RED,
         }
     }
 
-    pub fn new_content(&self) -> Option<&str> {
+    pub fn content_after(&self) -> &str {
         match self {
-            LogType::Edit { new_content } => Some(new_content),
-            LogType::Delete => None,
+            MessageLogKind::Edit { content_after, .. } => content_after,
+            MessageLogKind::Delete => Default::default(),
+        }
+    }
+
+    pub fn attachment_ids_after(&self) -> Vec<AttachmentId> {
+        match self {
+            MessageLogKind::Edit { attachments_after, .. } => attachments_after.iter().map(|a| a.id).collect_vec(),
+            MessageLogKind::Delete => Default::default(),
         }
     }
 }

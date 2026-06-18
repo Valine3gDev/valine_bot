@@ -13,7 +13,7 @@ use serenity::{
         CreateComponent, CreateInteractionResponse, CreateInteractionResponseMessage, CreateModal, CreateModalComponent,
     },
     model::{
-        channel::{ChannelType, GuildThread},
+        channel::{ChannelType, GuildThread, MessageFlags},
         guild::Member,
         id::GuildId,
     },
@@ -32,6 +32,12 @@ pub fn create_safe_message<'a>() -> CreateMessage<'a> {
 
 pub fn create_message<'a>(content: impl Into<Cow<'a, str>>) -> CreateMessage<'a> {
     create_safe_message().content(content)
+}
+
+pub fn create_components_v2_message<'a>(components: impl Into<Cow<'a, [CreateComponent<'a>]>>) -> CreateMessage<'a> {
+    create_safe_message()
+        .components(components)
+        .flags(MessageFlags::IS_COMPONENTS_V2)
 }
 
 pub fn create_interaction_message<'a>(
