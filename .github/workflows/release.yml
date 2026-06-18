@@ -45,6 +45,7 @@ jobs:
         with:
           cache-target: release
           cache-extra-identifier: ${{ matrix.target }}
+          target-dirs: target/${{ matrix.target }}
           targets: ${{ matrix.target }}
           bins: cargo-zigbuild,cargo-about
         env:
