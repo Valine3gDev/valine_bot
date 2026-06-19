@@ -92,16 +92,21 @@ async fn send_message_log<'a>(ctx: &Context, message: &Message, log_kind: Messag
             .build(),
     )];
 
+    let log_container_components = build_log_container_components(
+        message,
+        &log_kind,
+        &message_basic_info,
+        build_linked_removed_attachment_components(message, &attachment_ids_after, "ダウンロード中: \n"),
+    );
+    if log_container_components.len() <= 3 {
+        return Ok(());
+    }
+
     let mut log_message = send_message(
         ctx,
         &ctx.app_config().await.message_logging.channel_id,
         create_components_v2_message(&[create_container(
-            build_log_container_components(
-                message,
-                &log_kind,
-                &message_basic_info,
-                build_linked_removed_attachment_components(message, &attachment_ids_after, "ダウンロード中: \n"),
-            ),
+            log_container_components,
             Some(log_kind.color()),
             false,
         )]),
