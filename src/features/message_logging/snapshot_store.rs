@@ -184,12 +184,13 @@ impl MessageSnapshotStore {
             *id
         };
 
+        // URL が無効となっている可能性を考慮してメッセージを API から直接取ってくる
         let snapshot_message = ctx
-            .app_config()
-            .await
-            .message_logging
-            .snapshot_channel_id
-            .message(&ctx, snapshot_message_id)
+            .http()
+            .get_message(
+                ctx.app_config().await.message_logging.snapshot_channel_id,
+                snapshot_message_id,
+            )
             .await?;
 
         Ok(Some(snapshot_message))
