@@ -18,6 +18,22 @@ use crate::{
     },
 };
 
+fn has_removed_logged_attachments(message: &Message, new_message: &Message) -> bool {
+    let attachment_ids_after: Vec<_> = new_message.attachments.iter().map(|attachment| attachment.id).collect();
+
+    message
+        .attachments
+        .iter()
+        .any(|attachment| !attachment_ids_after.contains(&attachment.id))
+}
+
+/**
+ * メッセージの編集可能な内容が変化したかどうか
+ */
+fn message_update_log_content_changed(message: &Message, new_message: &Message) -> bool {
+    message.content != new_message.content || has_removed_logged_attachments(message, new_message)
+}
+
 pub struct MessageLoggingEventHandler {
     rebuilt_snapshot_store: AtomicBool,
     snapshot_store: Arc<MessageSnapshotStore>,
@@ -57,8 +73,7 @@ impl MessageLoggingEventHandler {
             id: new_message.id.to_string(),
         })?;
 
-        // リンクの埋め込みが展開される際、更新としてイベントが発火することがあるので、無視するように
-        if new_message.embeds.len() != message.embeds.len() {
+        if !message_update_log_content_changed(message, new_message) {
             return Ok(());
         }
 

@@ -23,8 +23,6 @@ use crate::{
     utils::{create_components_v2_message, create_safe_allowed_mentions, send_message},
 };
 
-const BASIC_LOG_COMPONENT_COUNT: usize = 3;
-
 pub struct MessageLogSender {
     snapshot_store: Arc<MessageSnapshotStore>,
 }
@@ -52,9 +50,6 @@ impl MessageLogSender {
             &message_basic_info,
             build_linked_removed_attachment_components(message, &attachment_ids_after),
         );
-        if log_container_components.len() <= BASIC_LOG_COMPONENT_COUNT {
-            return Ok(());
-        }
 
         let mut log_message = self
             .send_initial_log_message(ctx, &log_kind, log_container_components)
