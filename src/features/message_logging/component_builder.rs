@@ -215,7 +215,6 @@ fn removed_attachments<'a>(
 pub(in crate::features::message_logging) fn build_linked_removed_attachment_components<'a>(
     message: &'a Message,
     attachment_ids_after: &'a [AttachmentId],
-    list_prefix: &str,
 ) -> Vec<CreateContainerComponent<'a>> {
     if message.attachments.is_empty() {
         return vec![];
@@ -237,7 +236,6 @@ pub(in crate::features::message_logging) fn build_linked_removed_attachment_comp
             MessageBuilder::new()
                 .push("### ")
                 .push_line(bold_underline("削除された画像・動画"))
-                .push(list_prefix)
                 .push(galleries.join("\n").as_str())
                 .build(),
         ));
@@ -247,7 +245,6 @@ pub(in crate::features::message_logging) fn build_linked_removed_attachment_comp
             MessageBuilder::new()
                 .push("### ")
                 .push_line(bold_underline("削除されたファイル"))
-                .push(list_prefix)
                 .push(files.join("\n").as_str())
                 .build(),
         ));

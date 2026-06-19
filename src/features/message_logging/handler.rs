@@ -96,7 +96,7 @@ async fn send_message_log<'a>(ctx: &Context, message: &Message, log_kind: Messag
         message,
         &log_kind,
         &message_basic_info,
-        build_linked_removed_attachment_components(message, &attachment_ids_after, "ダウンロード中: \n"),
+        build_linked_removed_attachment_components(message, &attachment_ids_after),
     );
     if log_container_components.len() <= 3 {
         return Ok(());
@@ -113,14 +113,6 @@ async fn send_message_log<'a>(ctx: &Context, message: &Message, log_kind: Messag
     )
     .await
     .context("Failed to send message log")?;
-
-    if !message
-        .attachments
-        .iter()
-        .any(|attachment| !attachment_ids_after.contains(&attachment.id))
-    {
-        return Ok(());
-    }
 
     let edit_message = EditMessage::new().allowed_mentions(create_safe_allowed_mentions());
 
@@ -153,22 +145,6 @@ async fn send_message_log<'a>(ctx: &Context, message: &Message, log_kind: Messag
                         false,
                     )])
                     .attachments(edit_attachments),
-            )
-            .await?;
-    } else {
-        log_message
-            .edit(
-                &ctx,
-                edit_message.components(&[create_container(
-                    build_log_container_components(
-                        message,
-                        &log_kind,
-                        &message_basic_info,
-                        build_linked_removed_attachment_components(message, &attachment_ids_after, ""),
-                    ),
-                    Some(log_kind.color()),
-                    false,
-                )]),
             )
             .await?;
     }
