@@ -1,14 +1,18 @@
-use std::iter;
+use std::{borrow::Cow, iter};
 
 use crate::{
-    app::utils::components::create_container_text,
+    app::utils::components::{
+        create_container_section, create_container_text, create_section_thumbnail, create_separator,
+    },
     extensions::{AttachmentExt, MessageBuilderTimestampExt},
+    features::message_logging::log_type::MessageLogKind,
 };
 use itertools::{Either, Itertools, enumerate};
 use serenity::{
     all::{Message, MessageBuilder, MessageReferenceKind},
     builder::{
-        CreateContainerComponent, CreateFile, CreateMediaGallery, CreateMediaGalleryItem, CreateUnfurledMediaItem,
+        CreateContainerComponent, CreateFile, CreateMediaGallery, CreateMediaGalleryItem, CreateSectionComponent,
+        CreateUnfurledMediaItem,
     },
     model::{
         channel::{Attachment, MessageFlags, MessageReference, MessageType},
@@ -300,4 +304,40 @@ pub(in crate::features::message_logging) fn build_uploaded_removed_attachment_co
     }
 
     result
+}
+
+pub(in crate::features::message_logging) fn build_log_container_components<'a>(
+    message: &Message,
+    log_kind: &MessageLogKind,
+    basic_info_section_component: impl Into<Cow<'a, [CreateSectionComponent<'a>]>>,
+    attachment_components: Vec<CreateContainerComponent<'a>>,
+) -> Vec<CreateContainerComponent<'a>> {
+    iter::once(create_container_text(format!("### **{}**", log_kind.title())))
+        .chain(
+            [
+                Some(create_container_section(
+                    basic_info_section_component.into(),
+                    create_section_thumbnail(
+                        message
+                            .author
+                            .avatar_url()
+                            .unwrap_or("https://cdn.discordapp.com/embed/avatars/0.png".to_string()),
+                        Some("ユーザーアイコン"),
+                        false,
+                    ),
+                )),
+                build_message_reference_container_component(message),
+                build_poll_container_component(message),
+                build_diff_container_component(&message.content, log_kind.content_after()),
+            ]
+            .into_iter()
+            .filter_map(|c| c.map(|c| [create_separator(false), c].into_iter()))
+            .flatten(),
+        )
+        .chain(
+            attachment_components
+                .into_iter()
+                .flat_map(|c| [create_separator(false), c]),
+        )
+        .collect_vec()
 }

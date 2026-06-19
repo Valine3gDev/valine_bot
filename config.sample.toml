@@ -40,6 +40,8 @@ log_channel_id = "000000000000000000"
 [message_logging]
 # メッセージの削除・編集のログを残すチャンネルID
 channel_id = "000000000000000000"
+# 添付ファイル付きメッセージの転送用チャンネル
+snapshot_channel_id = "000000000000000000"
 
 
 [message_cache]

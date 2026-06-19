@@ -10,7 +10,10 @@ use duration_str::{deserialize_duration, deserialize_duration_chrono};
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
 use serde_with::{DisplayFromStr, serde_as};
-use serenity::all::{ChannelId, ForumTagId, GuildId, RoleId, Token, UserId};
+use serenity::{
+    all::{ChannelId, ForumTagId, GuildId, RoleId, Token, UserId},
+    model::id::GenericChannelId,
+};
 use tokio::fs::read_to_string;
 
 use crate::app::AppError;
@@ -72,6 +75,7 @@ pub struct HoneypotConfig {
 #[derive(Debug, Deserialize)]
 pub struct MessageLoggingConfig {
     pub channel_id: ChannelId,
+    pub snapshot_channel_id: GenericChannelId,
 }
 
 #[derive(Debug, Deserialize)]

@@ -126,6 +126,7 @@ impl MessageCacheHandler {
 
     async fn collect_cache(ctx: Context) {
         let config = ctx.app_config().await;
+        let ignore_channel_ids = [config.message_logging.snapshot_channel_id];
         let request_window = config.message_cache.request_window;
         let requests_per_window: usize = config.message_cache.requests_per_window.max(1).into();
         let concurrent_channels: usize = config.message_cache.concurrent_channels.max(1).into();
@@ -160,6 +161,11 @@ impl MessageCacheHandler {
 
                 for channel in channels {
                     let id = channel.id;
+
+                    if ignore_channel_ids.contains(&id.widen()) {
+                        continue;
+                    }
+
                     yield ChannelWrapper::Channel(channel);
 
                     for await thread in fetch_all_archived_public_thread(ctx, id, None).await {

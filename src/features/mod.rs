@@ -16,7 +16,7 @@ use crate::{
         auth::{AutoKickEventHandler, KeywordAuthEventHandler},
         honeypot::handle_honeypot_event,
         message_cache_handler::MessageCacheHandler,
-        message_logging::handle_message_logging_event,
+        message_logging::MessageLoggingEventHandler,
         question::handle_question_event,
         thread_auto_invite::handle_thread_auto_invite_event,
     },
@@ -25,7 +25,7 @@ use crate::{
 pub fn event_handlers(config: &AppConfig) -> BotEventHandlers {
     BotEventHandlers::new()
         .add(handle_honeypot_event)
-        .add(handle_message_logging_event)
+        .add(MessageLoggingEventHandler::new())
         .add(handle_thread_auto_invite_event)
         .add(handle_question_event)
         .add(KeywordAuthEventHandler::new())
