@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::vec;
 
 use crate::app::{AppApplicationContext, AppError, BotDataExt};
-use crate::features::question::QUESTION_CLOSE_PREFIX;
+use crate::features::question::create_question_toggle_button;
 use crate::features::question::modal::{BasicQuestionData, DetailedQuestionData};
 use crate::features::question::question_creation_handler::{CustomIds, QuestionCreationHandler};
 use crate::utils::has_authed_role;
@@ -187,9 +187,7 @@ pub async fn question(ctx: AppApplicationContext<'_>) -> Result<(), AppError> {
                 CreateMessage::default()
                     .content(msg)
                     .components(&[CreateComponent::ActionRow(CreateActionRow::buttons(&[
-                        CreateButton::new(&*format!("{QUESTION_CLOSE_PREFIX}:{}", ctx.interaction.user.id))
-                            .label("質問を解決済みにする")
-                            .style(ButtonStyle::Danger),
+                        create_question_toggle_button(ctx.interaction.user.id, false),
                     ]))]),
             )
             .set_applied_tags(&*forum_tag_ids),

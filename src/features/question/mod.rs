@@ -9,20 +9,57 @@ pub use command::question;
 use anyhow::Context as _;
 use serenity::{
     all::{
-        ButtonStyle, CacheHttp, ComponentInteractionCollector, ComponentInteractionDataKind, Context, CreateActionRow,
-        CreateButton, EditInteractionResponse, EditThread, Interaction, UserId,
+        ButtonStyle, CacheHttp, ComponentInteractionDataKind, Context, CreateActionRow, CreateButton, EditThread,
+        Interaction, UserId,
     },
-    builder::CreateComponent,
-    model::event::FullEvent,
+    builder::{CreateComponent, EditInteractionResponse, EditMessage},
+    model::{channel::GuildThread, event::FullEvent, id::ForumTagId},
 };
+use tracing::warn;
 use valine_bot_macros::event_handler;
 
-use crate::{
-    app::{AppError, BotDataExt, BotError},
-    utils::create_interaction_message,
-};
+use crate::app::{AppError, BotDataExt};
 
 pub static QUESTION_CLOSE_PREFIX: &str = "close_question_forum";
+const QUESTION_THREAD_EDIT_TIMEOUT: Duration = Duration::from_secs(10);
+
+fn parse_question_author_id(custom_id: &str) -> Option<UserId> {
+    custom_id
+        .strip_prefix(QUESTION_CLOSE_PREFIX)
+        .and_then(|value| value.strip_prefix(':'))
+        .and_then(|value| UserId::from_str(value).ok())
+}
+
+fn toggled_question_name(name: &str, solved_name_prefix: &str, solved: bool) -> String {
+    if solved {
+        if name.starts_with(solved_name_prefix) {
+            name.to_owned()
+        } else {
+            format!("{solved_name_prefix}{name}")
+        }
+    } else {
+        name.strip_prefix(solved_name_prefix).unwrap_or(name).to_owned()
+    }
+}
+
+fn toggled_applied_tags(thread: &GuildThread, tag_id: ForumTagId, solved: bool) -> Vec<ForumTagId> {
+    let mut applied_tags = thread.applied_tags.to_vec();
+    if solved {
+        applied_tags.push(tag_id);
+    } else {
+        applied_tags.retain(|tag| *tag != tag_id);
+    }
+    applied_tags
+}
+
+pub fn create_question_toggle_button(author_id: UserId, solved: bool) -> CreateButton<'static> {
+    let button = CreateButton::new(format!("{QUESTION_CLOSE_PREFIX}:{author_id}"));
+    if solved {
+        button.label("質問を再開する").style(ButtonStyle::Success)
+    } else {
+        button.label("質問を解決済みにする").style(ButtonStyle::Danger)
+    }
+}
 
 async fn handle_interaction_create(ctx: &Context, interaction: &Interaction) -> Result<(), AppError> {
     let Interaction::Component(interaction) = interaction else {
@@ -31,19 +68,17 @@ async fn handle_interaction_create(ctx: &Context, interaction: &Interaction) -> 
     let ComponentInteractionDataKind::Button = interaction.data.kind else {
         return Ok(());
     };
-    let custom_id = &interaction.data.custom_id;
-    if !custom_id.starts_with(QUESTION_CLOSE_PREFIX) {
+    let Some(author_id) = parse_question_author_id(&interaction.data.custom_id) else {
         return Ok(());
-    }
-
-    let author_id = custom_id
-        .strip_prefix(QUESTION_CLOSE_PREFIX)
-        .and_then(|value| value.strip_prefix(':'))
-        .ok_or(BotError::InvalidEventData("question close custom ID"))?;
-    let author_id = UserId::from_str(author_id)?;
+    };
     if author_id != interaction.user.id {
         return Ok(());
     }
+
+    interaction
+        .defer_ephemeral(ctx.http())
+        .await
+        .context("Failed to defer question toggle response")?;
 
     let config = &ctx.app_config().await.question;
     let thread = interaction
@@ -52,76 +87,65 @@ async fn handle_interaction_create(ctx: &Context, interaction: &Interaction) -> 
         .to_thread(&ctx, interaction.guild_id)
         .await
         .context("Failed to get question thread")?;
-    if thread.applied_tags.contains(&config.solved_tag) {
-        interaction
-            .create_response(ctx.http(), create_interaction_message("既に解決済みです。", true, None))
-            .await
-            .context("Failed to send already-solved response")?;
-        return Ok(());
+
+    let next_solved = !thread.applied_tags.contains(&config.solved_tag);
+
+    let edit_thread = EditThread::new()
+        .name(toggled_question_name(
+            &thread.base.name,
+            &config.solved_name_prefix,
+            next_solved,
+        ))
+        .applied_tags(toggled_applied_tags(&thread, config.solved_tag, next_solved));
+
+    let edit_result = tokio::time::timeout(
+        QUESTION_THREAD_EDIT_TIMEOUT,
+        interaction.channel_id.expect_thread().edit(ctx.http(), edit_thread),
+    )
+    .await;
+
+    match edit_result {
+        Ok(result) => {
+            result.with_context(|| format!("Failed to edit thread - solved: {next_solved}"))?;
+        }
+        Err(_) => {
+            warn!(
+                "Timed out editing question thread {} after {:?}",
+                interaction.channel_id, QUESTION_THREAD_EDIT_TIMEOUT
+            );
+            interaction
+                .edit_response(
+                    ctx.http(),
+                    EditInteractionResponse::new()
+                        .content("チャンネル編集がタイムアウトしました。時間をおいて再度お試しください。"),
+                )
+                .await
+                .context("Failed to send question thread edit timeout response")?;
+            return Ok(());
+        }
     }
 
-    let confirm_custom_id = format!("close_question_confirm:{}", interaction.id);
-    let cancel_custom_id = format!("close_question_cancel:{}", interaction.id);
-
-    interaction
-        .create_response(
-            ctx.http(),
-            create_interaction_message(
-                "本当に質問を終了しますか？",
-                true,
-                Some(&[CreateComponent::ActionRow(CreateActionRow::buttons(&[
-                    CreateButton::new(&confirm_custom_id)
-                        .label("はい")
-                        .emoji('✅')
-                        .style(ButtonStyle::Danger),
-                    CreateButton::new(&cancel_custom_id)
-                        .label("いいえ")
-                        .emoji('❎')
-                        .style(ButtonStyle::Success),
-                ]))]),
-            ),
+    let mut start_message = (*interaction.message).clone();
+    start_message
+        .edit(
+            &ctx,
+            EditMessage::new().components(&[CreateComponent::ActionRow(CreateActionRow::buttons(&[
+                create_question_toggle_button(author_id, next_solved),
+            ]))]),
         )
         .await
-        .context("Failed to send question close confirmation")?;
-
-    let res = ComponentInteractionCollector::new(ctx)
-        .custom_ids(
-            [confirm_custom_id.clone(), cancel_custom_id]
-                .map(|id| id.try_into().unwrap())
-                .into(),
-        )
-        .timeout(Duration::from_secs(60))
-        .await;
-
-    let (confirmed, text) = match res {
-        Some(i) if i.data.custom_id == confirm_custom_id => (true, "質問を解決済みにしました。"),
-        _ => (false, "キャンセルしました。"),
-    };
-
-    if confirmed {
-        let mut applied_tags = thread.applied_tags.to_vec();
-        applied_tags.push(config.solved_tag);
-
-        interaction
-            .channel_id
-            .expect_thread()
-            .edit(
-                ctx.http(),
-                EditThread::new()
-                    .name(format!("{}{}", config.solved_name_prefix, thread.base.name))
-                    .applied_tags(applied_tags),
-            )
-            .await
-            .context("Failed to mark question thread as solved")?;
-    }
+        .context("Failed to update question start message button")?;
 
     interaction
         .edit_response(
             ctx.http(),
-            EditInteractionResponse::new().content(text).components(vec![]),
+            EditInteractionResponse::new().content(if next_solved {
+                "解決済みにしました。"
+            } else {
+                "再開しました。"
+            }),
         )
-        .await
-        .context("Failed to update question close response")?;
+        .await?;
 
     Ok(())
 }
